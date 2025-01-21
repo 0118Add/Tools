@@ -86,7 +86,7 @@ download_mihomo() {
 
 download_service() {
     local system_file="/etc/systemd/system/mihomo.service"
-    local service_url=$(get_url "https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Service/mihomo.service")
+    local service_url=$(get_url "https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Service/mihomo.service")
     curl -s -o "$system_file" "$service_url" || { echo -e "${red}系统服务下载失败，可能是网络问题，建议重新运行本脚本重试下载${reset}"; exit 1; }
     chmod +x "$system_file"
     systemctl enable mihomo
@@ -100,7 +100,7 @@ download_wbeui() {
 
 download_shell() {
     local shell_file="/usr/bin/mihomo"
-    local sh_url=$(get_url "https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/mihomo/mihomo.sh")
+    local sh_url=$(get_url "https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Script/mihomo/mihomo.sh")
     [ -f "$shell_file" ] && rm -f "$shell_file"
     wget -q -O "$shell_file" --no-check-certificate "$sh_url" || { echo -e "${red}mihomo 管理脚本下载失败，可能是网络问题，建议重新运行本脚本重试下载${reset}"; exit 1; }
     chmod +x "$shell_file"
@@ -141,8 +141,8 @@ config_mihomo() {
     read -p "$(echo -e "请选择运行模式（${green}推荐使用 TUN 模式${reset}）请输入选择(1/2): ")" confirm
     confirm=${confirm:-1}
     case "$confirm" in
-        1) config_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Config/mihomo.yaml" ;;
-        2) config_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Config/mihomotp.yaml" ;;
+        1) config_url="https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Config/mihomo.yaml" ;;
+        2) config_url="https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Config/mihomotp.yaml" ;;
         *) echo -e "${red}无效选择，跳过配置文件下载。${reset}"; return ;;
     esac
     config_url=$(get_url "$config_url")
