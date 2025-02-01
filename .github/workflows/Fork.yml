@@ -15,12 +15,12 @@ jobs:
     - name: Checkout target repository
       uses: actions/checkout@v4.1.0
       with:
-        repository: Abcd789JK/Tools
+        repository: 0118Add/Tools
         path: Tools-repo
 
     - name: 复刻
       run: |
-        curl https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/fork.sh | sh
+        curl https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Script/fork.sh | sh
 
 ###### Commit
     - name: Add and Commit
