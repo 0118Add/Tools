@@ -2,7 +2,7 @@ name: Fork & Edit
 
 on:
   workflow_dispatch:
-  schedule:
+  #schedule:
     #- cron: "15 */6 * * *"
   
 jobs:
