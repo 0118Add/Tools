@@ -81,7 +81,7 @@ apt-get install -y curl git wget nano
 #### 已经加入自动识别网络环境功能，确保你的设备能正常联网就行
 
 ```bash
-wget -O install.sh --no-check-certificate https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/mihomo/install.sh && chmod +x install.sh && ./install.sh
+wget -O install.sh --no-check-certificate https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Script/mihomo/install.sh && chmod +x install.sh && ./install.sh
 ```
 
 ## 手动检查、排错
