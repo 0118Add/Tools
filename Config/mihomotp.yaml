@@ -5,6 +5,8 @@
 #!author = MetaCubeX
 
 # 机场配置
+
+# 全局配置
 proxies: 
   - name: "直连"
     type: direct
