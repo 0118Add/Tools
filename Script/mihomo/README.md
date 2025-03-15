@@ -81,13 +81,13 @@ apt-get install -y curl git wget nano
 #### 已经加入自动识别网络环境功能，确保你的设备能正常联网就行
 
 ```bash
-wget -O install.sh --no-check-certificate https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/mihomo/install.sh && chmod +x install.sh && ./install.sh
+wget -O install.sh --no-check-certificate https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Script/mihomo/install.sh && chmod +x install.sh && ./install.sh
 ```
 
 #### CND 加速版，主要是下载脚本用的，脚本里面的功能和上面一样（有时候 CND 会失效，等待修复就好）
 
 ```bash
-wget -O install.sh --no-check-certificate https://github.boki.moe/https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/mihomo/install.sh && chmod +x install.sh && ./install.sh
+wget -O install.sh --no-check-certificate https://github.boki.moe/https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Script/mihomo/install.sh && chmod +x install.sh && ./install.sh
 ```
 
 ## 手动检查、排错
@@ -107,7 +107,7 @@ journalctl -u mihomo -o cat -e
 ### Beta 版本（我自己测试用的，不建议安装此版本）
 
 ```bash
-wget -O install.sh --no-check-certificate https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/Beta/mihomo/install.sh && chmod +x install.sh && ./install.sh
+wget -O install.sh --no-check-certificate https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Script/Beta/mihomo/install.sh && chmod +x install.sh && ./install.sh
 ```
 
 ## Linux 系统设置上海时区
