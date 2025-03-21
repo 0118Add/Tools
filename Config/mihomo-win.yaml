@@ -33,12 +33,12 @@ rule-anchor:
 proxy-providers:
   provider1:
     <<: *pr
-    url: "此处填写机场订阅"
+    url: "https://52pokemon.xz61.cn/api/v1/client/subscribe?token=7e4a5414bb5548858aa93a664192c9d5"
     override:
       additional-prefix: "此处填写机场名字（可选）"
   provider2:
     <<: *pr
-    url: "此处填写机场订阅"
+    url: "https://52pokemon.xz61.cn/api/v1/client/subscribe?token=7e4a5414bb5548858aa93a664192c9d5"
     override:
       additional-prefix: "此处填写机场名字（可选）"
 
@@ -57,7 +57,7 @@ tcp-concurrent: true
 # ui 配置
 external-ui: ui
 external-controller: 0.0.0.0:9090
-external-ui-url: "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip"
+external-ui-url: "https://github.com/Zephyruso/zashboard/archive/refs/heads/gh-pages.zip"
 
 find-process-mode: strict
 global-client-fingerprint: chrome
