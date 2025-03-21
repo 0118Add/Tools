@@ -278,4 +278,4 @@ rule-providers:
   # 广告
   Ads_Block_domain:
     <<: *domain_text
-    url: https://github.com/thNylHx/Tools/raw/main/Ruleset/mihomo/Block/Ads_Block.list
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/Block/Ads_Block.list
