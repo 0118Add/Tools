@@ -5,9 +5,9 @@ name: 同步 mihomo 上游规则  # 工作流名称：同步 mihomo 上游规则
 on:
   # 允许通过 GitHub 界面手动触发工作流
   workflow_dispatch:  # 支持手动触发
-  schedule:  # 定时触发设置
+  # schedule:  # 定时触发设置
     # 设置定时触发规则，使用 cron 语法表示每6小时触发一次
-    - cron: '0 16,22,4,10 * * *'  # 注：以上时间均为上海时间（0:00、6:00、12:00、18:00 执行）
+    # - cron: '0 16,22,4,10 * * *'  # 注：以上时间均为上海时间（0:00、6:00、12:00、18:00 执行）
 
 # 工作流
 jobs:
@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v4  # 使用 GitHub 官方 checkout action 检出代码
         with:
           # 指定需要检出的远程仓库，格式为“用户名/仓库名”
-          repository: Abcd789JK/Tools  # 目标仓库：Abcd789JK/Tools
+          repository: 0118Add/Tools  # 目标仓库：Abcd789JK/Tools
           # 设置将仓库检出到本地的目录名称为 Tools-repo
           path: Tools-repo  # 本地目录名称：Tools-repo
 
@@ -111,19 +111,6 @@ jobs:
         shell: bash
         run: |
           echo "time=$(date +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_ENV
-
-      - name: 发送 Telegram 通知  # 通过 Telegram 发送执行通知
-        uses: appleboy/telegram-action@master
-        with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_TOKEN }}
-          message: |
-            📢 通知
-            🚀 来源：GitHub Actions
-            ✉️ 标题：同步上游规则
-            📦 仓库：JK_789
-            ⏰ 时间：${{ env.time }}
-            🎉 状态：全部任务成功执行
 
       # 步骤6：清理旧的工作流运行记录
       - name: 清理工作流  # 定义步骤名称：清理工作流
