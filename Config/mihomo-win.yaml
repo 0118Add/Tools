@@ -33,12 +33,12 @@ rule-anchor:
 proxy-providers:
   provider1:
     <<: *pr
-    url: "https://52pokemon.xz61.cn/api/v1/client/subscribe?token=7e4a5414bb5548858aa93a664192c9d5"
+    url: "机场订阅"
     override:
       additional-prefix: "此处填写机场名字（可选）"
   provider2:
     <<: *pr
-    url: "https://52pokemon.xz61.cn/api/v1/client/subscribe?token=7e4a5414bb5548858aa93a664192c9d5"
+    url: "机场订阅"
     override:
       additional-prefix: "此处填写机场名字（可选）"
 
