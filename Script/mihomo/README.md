@@ -224,6 +224,7 @@ systemctl restart sshd
 # 第一组
 pacman-key --init
 pacman-key --populate archlinux
+pacman -Syu --noconfirm
 ```
 
 ```bash

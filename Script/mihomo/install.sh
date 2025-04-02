@@ -1,7 +1,7 @@
 #!/bin/bash
 #!name = mihomo 一键安装脚本
-#!desc = 安装 & 配置（同时兼容 alpine、debian、ubuntu）
-#!date = 2025-04-01 09:51:12
+#!desc = 安装 & 配置
+#!date = 2025-04-01 16:56:32
 #!author = ChatGPT
 
 # 当遇到错误或管道错误时立即退出

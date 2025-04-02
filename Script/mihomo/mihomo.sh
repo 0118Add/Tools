@@ -1,7 +1,7 @@
 #!/bin/bash
 #!name = mihomo 一键管理脚本
-#!desc = 管理 & 面板（同时兼容 alpine、debian、ubuntu）
-#!date = 2025-04-01 09:51:12
+#!desc = 管理 & 面板
+#!date = 2025-04-01 16:56:32
 #!author = ChatGPT
 
 # 当遇到错误或管道错误时立即退出
@@ -22,7 +22,7 @@ reset="\033[0m"   # 重置
 #############################
 sh_ver="0.1.7"
 use_cdn=false
-distro="unknown"  # 系统类型：debian（包括 Ubuntu）或 alpine
+distro="unknown"  # 系统类型：debian, ubuntu, alpine, fedora
 arch=""           # 系统架构（转换后的标准格式）
 arch_raw=""       # 原始架构信息
 
