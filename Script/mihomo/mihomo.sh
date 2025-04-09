@@ -363,7 +363,7 @@ install_mihomo() {
     local folders="/root/mihomo"
     local service_file="/etc/init.d/mihomo"
     local system_file="/etc/systemd/system/mihomo.service"
-    local install_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/mihomo/install.sh"
+    local install_url="https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Script/mihomo/install.sh"
     if [ -d "$folders" ]; then
         echo -e "${red}检测到 mihomo 已经安装在 ${folders} 目录下${reset}"
         read -p "$(echo -e "${red}警告：重新安装将删除当前配置和文件！\n${yellow}是否删除并重新安装？${reset} (y/n): ")" input
@@ -565,7 +565,7 @@ update_mihomo() {
 update_shell() {
     check_network
     local shell_file="/usr/bin/mihomo"
-    local sh_ver_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/mihomo/mihomo.sh"
+    local sh_ver_url="https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Script/mihomo/mihomo.sh"
     local sh_new_ver=$(curl -sSL "$(get_url "$sh_ver_url")" | grep 'sh_ver="' | awk -F "=" '{print $NF}' | sed 's/\"//g' | head -1)
     echo -e "${green}开始检查脚本是否有更新${reset}"
     if [ "$sh_ver" == "$sh_new_ver" ]; then
@@ -607,8 +607,8 @@ config_mihomo() {
     check_network
     local folders="/root/mihomo"
     local config_file="/root/mihomo/config.yaml"
-    local tun_config_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Config/mihomo.yaml"
-    local tproxy_config_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Config/mihomotp.yaml"
+    local tun_config_url="https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Config/mihomo.yaml"
+    local tproxy_config_url="https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Config/mihomotp.yaml"
     local iface ipv4 ipv6 config_url
     iface=$(ip route | awk '/default/ {print $5}')
     ipv4=$(ip addr show "$iface" | awk '/inet / {print $2}' | cut -d/ -f1)
