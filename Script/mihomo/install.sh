@@ -228,7 +228,7 @@ download_service() {
 #############################
 download_wbeui() {
     local wbe_file="/root/mihomo/ui"
-    local wbe_url="https://github.com/metacubex/metacubexd.git"
+    local wbe_url="https://github.com/Zephyruso/zashboard.git"
     git clone "$wbe_url" -b gh-pages "$wbe_file" || { 
         echo -e "${red}管理面板下载失败，请检查网络后重试${reset}"
         exit 1
