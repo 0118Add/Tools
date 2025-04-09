@@ -58,7 +58,7 @@ tcp-concurrent: true
 # ui 配置
 external-ui: ui
 external-controller: 0.0.0.0:9090
-external-ui-url: "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip"
+external-ui-url: "https://github.com/Zephyruso/zashboard/archive/refs/heads/gh-pages.zip"
 
 find-process-mode: strict
 global-client-fingerprint: chrome
@@ -187,98 +187,98 @@ rule-providers:
   # ChatGPT
   OpenAI_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/Openai.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/Openai.mrs
   # 谷歌
   YouTube_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/YouTube.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/YouTube.mrs
   Google_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/Google.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/Google.mrs
   # 微软
   GitHub_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/GitHub.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/GitHub.mrs
   OneDrive_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/OneDrive.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/OneDrive.mrs
   Microsoft_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/Microsoft.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/Microsoft.mrs
   # 游戏
   Epic_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/Epic.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/Epic.mrs
   Steam_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/Steam.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/Steam.mrs
   # 社交
   Telegram_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/Telegram.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/Telegram.mrs
   Facebook_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/Facebook.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/Facebook.mrs
   Instagram_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/Instagram.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/Instagram.mrs
   PayPal_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/PayPal.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/PayPal.mrs
   Twitter_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/Twitter.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/Twitter.mrs
   # 影视
   Spotify_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/Spotify.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/Spotify.mrs
   Netflix_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/Netflix.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/Netflix.mrs
   Disney_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/Disney.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/Disney.mrs
   TikTok_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/Tiktok.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/Tiktok.mrs
   # 海外
   Global_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/Global.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/Global.mrs
   # 苹果
   Apple_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/Apple.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/Apple.mrs
   # 国内
   Bilibili_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/Bilibili.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/Bilibili.mrs
   China_domain:
     <<: *domain
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geosite/China.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geosite/China.mrs
 
   # ipcidr
   China_ip:
     <<: *ipcidr
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geoip/China.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geoip/China.mrs
   Local_ip:
     <<: *ipcidr
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geoip/Local.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geoip/Local.mrs
   Google_ip:
     <<: *ipcidr
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geoip/Google.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geoip/Google.mrs
   Twitter_ip:
     <<: *ipcidr
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geoip/Twitter.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geoip/Twitter.mrs
   Netflix_ip:
     <<: *ipcidr
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geoip/Netflix.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geoip/Netflix.mrs
   Telegram_ip:
     <<: *ipcidr
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geoip/Telegram.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geoip/Telegram.mrs
   Facebook_ip:
     <<: *ipcidr
-    url: https://github.com/Abcd789JK/Tools/raw/main/Ruleset/mihomo/geoip/Facebook.mrs
+    url: https://github.com/0118Add/Tools/raw/main/Ruleset/mihomo/geoip/Facebook.mrs
 
   # 广告
   Ads_Block_domain:
