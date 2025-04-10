@@ -1,0 +1,8 @@
+#!/sbin/openrc-run
+
+name="shadowsocks"
+description="Shadowsocks server"
+command="/root/shadowsocks/ssserver"
+command_args="-c /root/shadowsocks/config.json"
+pidfile="/run/shadowsocks.pid"
+command_background=true

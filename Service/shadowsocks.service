@@ -1,0 +1,14 @@
+[Unit]
+Description=Shadowsocks Server
+After=network.target
+
+[Service]
+ExecStart=/root/shadowsocks/ssserver -c /root/shadowsocks/config.json
+Restart=on-failure
+PIDFile=/run/shadowsocks.pid
+User=root
+Group=root
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+[Install]
+WantedBy=multi-user.target
