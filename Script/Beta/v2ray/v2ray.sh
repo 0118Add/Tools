@@ -1,7 +1,7 @@
 #!/bin/bash
 #!name = v2ray 一键管理脚本 Beta
 #!desc = 管理 & 面板
-#!date = 2025-04-05 16:40:48
+#!date = 2025-04-11 20:37:32
 #!author = ChatGPT
 
 # 当遇到错误或管道错误时立即退出

@@ -1,40 +1,104 @@
 #!/bin/bash
-
 #!name = v2ray 一键管理脚本
 #!desc = 管理 & 面板
-#!date = 2025-03-10 16:00
+#!date = 2025-04-11 20:37:32
 #!author = ChatGPT
 
+# 当遇到错误或管道错误时立即退出
 set -e -o pipefail
 
-red="\033[31m"  ## 红色
-green="\033[32m"  ## 绿色 
-yellow="\033[33m"  ## 黄色
-blue="\033[34m"  ## 蓝色
-cyan="\033[36m"  ## 青色
-reset="\033[0m"  ## 重置
+#############################
+#         颜色变量         #
+#############################
+red="\033[31m"    # 红色
+green="\033[32m"  # 绿色
+yellow="\033[33m" # 黄色
+blue="\033[34m"   # 蓝色
+cyan="\033[36m"   # 青色
+reset="\033[0m"   # 重置颜色
 
-sh_ver="0.1.3"
-
+#############################
+#       全局变量定义       #
+#############################
+sh_ver="0.1.4"
 use_cdn=false
+distro="unknown"  # 系统类型：debian, ubuntu, alpine, fedora
+arch=""           # 转换后的系统架构
+arch_raw=""       # 原始系统架构信息
 
-check_network() {
-    if ! curl -s --head --max-time 3 "https://www.google.com" > /dev/null; then
-        use_cdn=true
+#############################
+#       系统检测函数       #
+#############################
+check_distro() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        case "$ID" in
+            debian|ubuntu)
+                distro="$ID"
+                service_enable() { systemctl enable v2ray; }
+                service_restart() { systemctl daemon-reload; systemctl start v2ray; }
+                ;;
+            alpine)
+                distro="alpine"
+                service_enable() { rc-update add v2ray default; }
+                service_restart() { rc-service v2ray restart; }
+                ;;
+            fedora)
+                distro="fedora"
+                service_enable() { systemctl enable v2ray; }
+                service_restart() { systemctl daemon-reload; systemctl start v2ray; }
+                ;;
+            arch)
+                distro="arch"
+                service_enable() { systemctl enable v2ray; }
+                service_restart() { systemctl daemon-reload; systemctl start v2ray; }
+                ;;
+            *)
+                echo -e "${red}不支持的系统：${ID}${reset}"
+                exit 1
+                ;;
+        esac
+    else
+        echo -e "${red}无法识别当前系统类型${reset}"
+        exit 1
     fi
 }
 
+#############################
+#       网络检测函数       #
+#############################
+check_network() {
+    if ! curl -s --head --fail --connect-timeout 3 -o /dev/null "https://www.google.com"; then
+        use_cdn=true
+    else
+        use_cdn=false
+    fi
+}
+
+#############################
+#       URL 获取函数       #
+#############################
 get_url() {
     local url=$1
-    local final_url=""
-    final_url=$([ "$use_cdn" = true ] && echo "https://gh-proxy.com/$url" || echo "$url")
-    if ! curl --silent --head --fail --max-time 3 "$final_url" > /dev/null; then
-        echo -e "${red}连接失败，可能是网络或者代理站点不可用，请检查网络并稍后重试${reset}" >&2
-        exit 1
+    local final_url
+    if [ "$use_cdn" = true ]; then
+        final_url="https://gh-proxy.com/$url"
+        if ! curl --silent --head --fail --connect-timeout 3 -L "$final_url" -o /dev/null; then
+            final_url="https://github.boki.moe/$url"
+        fi
+    else
+        final_url="$url"
+    fi
+    if ! curl --silent --head --fail --connect-timeout 3 -L "$final_url" -o /dev/null; then
+        echo -e "${red}连接失败，可能是网络或代理站点不可用，请检查后重试！${reset}" >&2
+        return 1
     fi
     echo "$final_url"
 }
 
+#############################
+#    检查 v2ray 是否已安装  #
+#############################
 check_installation() {
     local file="/root/v2ray/v2ray"
     if [ ! -f "$file" ]; then
@@ -45,15 +109,35 @@ check_installation() {
     return 0
 }
 
+#############################
+#    Alpine 系统运行状态检测  #
+#############################
+is_running_alpine() {
+    if [ -f "/run/v2ray.pid" ]; then
+        pid=$(cat /run/v2ray.pid)
+        if [ -d "/proc/$pid" ]; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+#############################
+#         返回主菜单         #
+#############################
 start_menu() {
     echo && echo -n -e "${yellow}* 按回车返回主菜单 *${reset}" && read temp
     menu
 }
 
+#############################
+#         状态显示函数       #
+#############################
 show_status() {
     local file="/root/v2ray/v2ray"
     local version_file="/root/v2ray/version.txt"
     local install_status run_status auto_start software_version
+    distro=$(grep -E '^ID=' /etc/os-release | cut -d= -f2)
     if [ ! -f "$file" ]; then
         install_status="${red}未安装${reset}"
         run_status="${red}未运行${reset}"
@@ -61,15 +145,33 @@ show_status() {
         software_version="${red}未安装${reset}"
     else
         install_status="${green}已安装${reset}"
-        if systemctl is-active --quiet v2ray; then
-            run_status="${green}已运行${reset}"
+        if [ "$distro" = "alpine" ]; then
+            if [ -f "/run/v2ray.pid" ]; then
+                pid=$(cat /run/v2ray.pid)
+                if [ -d "/proc/$pid" ]; then
+                    run_status="${green}已运行${reset}"
+                else
+                    run_status="${red}未运行${reset}"
+                fi
+            else
+                run_status="${red}未运行${reset}"
+            fi
+            if rc-status default 2>/dev/null | awk '{print $1}' | grep -qx "v2ray"; then
+                auto_start="${green}已设置${reset}"
+            else
+                auto_start="${red}未设置${reset}"
+            fi
         else
-            run_status="${red}未运行${reset}"
-        fi
-        if systemctl is-enabled --quiet v2ray; then
-            auto_start="${green}已设置${reset}"
-        else
-            auto_start="${red}未设置${reset}"
+            if systemctl is-active --quiet v2ray; then
+                run_status="${green}已运行${reset}"
+            else
+                run_status="${red}未运行${reset}"
+            fi
+            if systemctl is-enabled --quiet v2ray; then
+                auto_start="${green}已设置${reset}"
+            else
+                auto_start="${red}未设置${reset}"
+            fi
         fi
         if [ -f "$version_file" ]; then
             software_version=$(cat "$version_file")
@@ -84,25 +186,92 @@ show_status() {
     echo -e "软件版本：${green}${software_version}${reset}"
 }
 
+#############################
+#      服务管理函数         #
+#############################
 service_v2ray() {
     check_installation || { start_menu; return; }
     local action="$1"
-    action_text=""
+    local action_text=""
     case "$action" in
-        start) action_text="启动" ;;
-        stop) action_text="停止" ;;
+        start)   action_text="启动" ;;
+        stop)    action_text="停止" ;;
         restart) action_text="重启" ;;
-        enable) action_text="设置开机自启" ;;
+        enable)  action_text="设置开机自启" ;;
         disable) action_text="取消开机自启" ;;
         logs)    action_text="查看日志" ;;
     esac
-    if [[ "$action" == "enable" || "$action" == "disable" ]]; then
+    if [ "$distro" = "alpine" ]; then
+        if [ "$action" == "logs" ]; then
+            echo -e "${green}日志查看：请使用 logread 或查看 /var/log/messages${reset}"
+            start_menu
+            return
+        fi
+        if [ "$action" == "enable" ]; then
+            if rc-update show default | grep -q "v2ray"; then
+                echo -e "${yellow}已${action_text}，无需重复操作${reset}"
+            else
+                echo -e "${green}正在${action_text}请等待${reset}"
+                sleep 1s
+                if rc-update add v2ray default; then
+                    echo -e "${green}${action_text}成功${reset}"
+                else
+                    echo -e "${red}${action_text}失败${reset}"
+                fi
+            fi
+            start_menu
+            return
+        elif [ "$action" == "disable" ]; then
+            if ! rc-update show default | grep -q "v2ray"; then
+                echo -e "${yellow}已${action_text}，无需重复操作${reset}"
+            else
+                echo -e "${green}正在${action_text}请等待${reset}"
+                sleep 1s
+                if rc-update del v2ray; then
+                    echo -e "${green}${action_text}成功${reset}"
+                else
+                    echo -e "${red}${action_text}失败${reset}"
+                fi
+            fi
+            start_menu
+            return
+        fi
+        if [ "$action" == "start" ]; then
+            if is_running_alpine; then
+                echo -e "${yellow}已${action_text}，无需重复操作${reset}"
+                start_menu
+                return
+            fi
+        elif [ "$action" == "stop" ]; then
+            if ! is_running_alpine; then
+                echo -e "${yellow}已${action_text}，无需重复操作${reset}"
+                start_menu
+                return
+            fi
+        fi
+        echo -e "${green}正在${action_text}请等待${reset}"
+        sleep 1s
+        case "$action" in
+            start)   rc-service v2ray start ;;
+            stop)    rc-service v2ray stop ;;
+            restart) rc-service v2ray restart ;;
+        esac
+        if [ $? -eq 0 ]; then
+            echo -e "${green}${action_text}成功${reset}"
+        else
+            echo -e "${red}${action_text}失败${reset}"
+        fi
+        start_menu
+        return
+    fi
+    if [ "$action" == "enable" ] || [ "$action" == "disable" ]; then
         local is_enabled=$(systemctl is-enabled --quiet v2ray && echo "enabled" || echo "disabled")
-        if [[ "$action" == "enable" && "$is_enabled" == "enabled" ]] || 
-           [[ "$action" == "disable" && "$is_enabled" == "disabled" ]]; then
+        if { [ "$action" == "enable" ] && [ "$is_enabled" == "enabled" ]; } || \
+           { [ "$action" == "disable" ] && [ "$is_enabled" == "disabled" ]; }; then
             echo -e "${yellow}已${action_text}，无需重复操作${reset}"
         else
-            echo -e "${green}正在 ${action_text} v2ray...${reset}"
+            echo -e "${green}正在${action_text}请等待${reset}"
+            sleep 1s
             if systemctl "$action" v2ray; then
                 echo -e "${green}${action_text}成功${reset}"
             else
@@ -112,19 +281,20 @@ service_v2ray() {
         start_menu
         return
     fi
-    if [[ "$action" == "logs" ]]; then
+    if [ "$action" == "logs" ]; then
         echo -e "${green}正在实时查看 v2ray 日志，按 Ctrl+C 退出${reset}"
         journalctl -u v2ray -o cat -f
         return
     fi
     local service_status=$(systemctl is-active --quiet v2ray && echo "active" || echo "inactive")
-    if [[ "$action" == "start" && "$service_status" == "active" ]] || 
-       [[ "$action" == "stop" && "$service_status" == "inactive" ]]; then
+    if { [ "$action" == "start" ] && [ "$service_status" == "active" ]; } || \
+       { [ "$action" == "stop" ] && [ "$service_status" == "inactive" ]; }; then
         echo -e "${yellow}已${action_text}，无需重复操作${reset}"
         start_menu
         return
     fi
-    echo -e "${green}正在 ${action_text} v2ray...${reset}"
+    echo -e "${green}正在${action_text}请等待${reset}"
+    sleep 1s
     if systemctl "$action" v2ray; then
         echo -e "${green}${action_text}成功${reset}"
     else
@@ -133,33 +303,53 @@ service_v2ray() {
     start_menu
 }
 
-start_v2ray() { service_v2ray start; }
-stop_v2ray() { service_v2ray stop; }
+# 简化操作命令
+start_v2ray()   { service_v2ray start; }
+stop_v2ray()    { service_v2ray stop; }
 restart_v2ray() { service_v2ray restart; }
-enable_v2ray() { service_v2ray enable; }
+enable_v2ray()  { service_v2ray enable; }
 disable_v2ray() { service_v2ray disable; }
-logs_v2ray(){ service_v2ray logs; }
+logs_v2ray()    { service_v2ray logs; }
 
+#############################
+#        卸载函数          #
+#############################
 uninstall_v2ray() {
     check_installation || { start_menu; return; }
     local folders="/root/v2ray"
     local shell_file="/usr/bin/v2ray"
+    local service_file="/etc/init.d/v2ray"
     local system_file="/etc/systemd/system/v2ray.service"
     read -p "$(echo -e "${red}警告：卸载后将删除当前配置和文件！\n${yellow}确认卸载 v2ray 吗？${reset} (y/n): ")" input
     case "$input" in
-        [Yy]* ) echo -e "${green}v2ray 卸载中请等待${reset}";;
-        [Nn]* ) echo -e "${yellow}v2ray 卸载已取消${reset}"; start_menu; return;;
-        * ) echo -e "${red}无效选择，卸载已取消${reset}"; start_menu; return;;
+        [Yy]* )
+            echo -e "${green}v2ray 卸载中请等待${reset}"
+            ;;
+        [Nn]* )
+            echo -e "${yellow}v2ray 卸载已取消${reset}"
+            start_menu
+            return
+            ;;
+        * )
+            echo -e "${red}无效选择，卸载已取消${reset}"
+            start_menu
+            return
+            ;;
     esac
     sleep 2s
     echo -e "${green}v2ray 卸载命令已发出${reset}"
-    systemctl stop v2ray.service 2>/dev/null || { echo -e "${red}停止 v2ray 服务失败${reset}"; exit 1; }
-    systemctl disable v2ray.service 2>/dev/null || { echo -e "${red}禁用 v2ray 服务失败${reset}"; exit 1; }
-    rm -f "$system_file" || { echo -e "${red}删除服务文件失败${reset}"; exit 1; }
+    if [ "$distro" = "alpine" ]; then
+        rc-service v2ray stop 2>/dev/null || { echo -e "${red}停止 v2ray 服务失败${reset}"; exit 1; }
+        rc-update del v2ray 2>/dev/null || { echo -e "${red}取消开机自启失败${reset}"; exit 1; }
+        rm -f "$service_file" || { echo -e "${red}删除服务文件失败${reset}"; exit 1; }
+    else
+        systemctl stop v2ray.service 2>/dev/null || { echo -e "${red}停止 v2ray 服务失败${reset}"; exit 1; }
+        systemctl disable v2ray.service 2>/dev/null || { echo -e "${red}禁用 v2ray 服务失败${reset}"; exit 1; }
+        rm -f "$system_file" || { echo -e "${red}删除服务文件失败${reset}"; exit 1; }
+    fi
     rm -rf "$folders" || { echo -e "${red}删除相关文件夹失败${reset}"; exit 1; }
-    systemctl daemon-reload || { echo -e "${red}重新加载 systemd 配置失败${reset}"; exit 1; }
     sleep 3s
-    if [ ! -f "$system_file" ] && [ ! -d "$folders" ]; then
+    if { [ "$distro" = "alpine" ] && [ ! -d "$folders" ]; } || { [ ! -f "$system_file" ] && [ ! -d "$folders" ]; }; then
         echo -e "${green}v2ray 卸载完成${reset}"
         echo ""
         echo -e "卸载成功，如果你想删除此脚本，则退出脚本后，输入 ${green}rm $shell_file -f${reset} 进行删除"
@@ -170,52 +360,95 @@ uninstall_v2ray() {
     start_menu
 }
 
+#############################
+#         安装函数         #
+#############################
 install_v2ray() {
     check_network
     local folders="/root/v2ray"
-    local install_url="https://raw.githubusercontent.com/Abcd789JK/Tools/main/Script/v2ray/install.sh"
+    local service_file="/etc/init.d/v2ray"
+    local system_file="/etc/systemd/system/v2ray.service"
+    local install_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/v2ray/install.sh"
     if [ -d "$folders" ]; then
-        echo -e "${red}检测到 v2ray 已经安装在 ${folders} 目录下${reset}"
-        read -p "$(echo -e "${red}警告：重新安装将删除当前配置和文件！\n${yellow}是否删除并重新安装？${reset} (y/n): ")" input
+        echo -e "${yellow}检测到 v2ray 已经安装在 ${folders} 目录下${reset}"
+        read -p "$(echo -e "${red}警告：重新安装将删除当前配置和文件！\n是否删除并重新安装？${reset} (y/n): ")" input
         case "$input" in
-            [Yy]* ) echo -e "${green}开始删除，重新安装中请等待${reset}";;
-            [Nn]* ) echo -e "${yellow}取消安装，保持现有安装${reset}"; start_menu; return;;
-            * ) echo -e "${red}无效选择，安装已取消${reset}"; start_menu; return;;
+            [Yy]* )
+                echo -e "${green}开始删除，重新安装中请等待${reset}"
+                if [ "$distro" = "alpine" ]; then
+                    rm -f "$service_file" || { echo -e "${red}删除服务文件失败${reset}"; exit 1; }
+                else
+                    rm -f "$system_file" || { echo -e "${red}删除服务文件失败${reset}"; exit 1; }
+                fi
+                rm -rf "$folders" || { echo -e "${red}删除相关文件夹失败${reset}"; exit 1; }
+                ;;
+            [Nn]* )
+                echo -e "${yellow}取消安装，保持现有安装${reset}"
+                start_menu
+                return
+                ;;
+            * )
+                echo -e "${red}无效选择，安装已取消${reset}"
+                start_menu
+                return
+                ;;
         esac
     fi
     bash <(curl -Ls "$(get_url "$install_url")")
 }
 
-get_schema(){
+#############################
+#      系统架构检测函数      #
+#############################
+get_schema() {
     arch_raw=$(uname -m)
-    case "${arch_raw}" in
-        'x86_64')    arch='64';;
-        'x86' | 'i686' | 'i386')     arch='32';;
-        'aarch64' | 'arm64') arch='arm64-v8a';;
-        'armv7' | 'armv7l')   arch='arm32-v7a';;
-        's390x')    arch='s390x';;
-        *)          echo -e "${red}不支持的架构: ${arch_raw}${reset}"; exit 1;;
+    case "$arch_raw" in
+        x86_64)
+            arch='64'
+            ;;
+        x86|i686|i386)
+            arch='32'
+            ;;
+        aarch64|arm64)
+            arch='arm64-v8a'
+            ;;
+        armv7|armv7l)
+            arch='arm32-v7a'
+            ;;
+        s390x)
+            arch='s390x'
+            ;;
+        *)
+            echo -e "${red}不支持的架构：${arch_raw}${reset}"
+            exit 1
+            ;;
     esac
 }
 
+#############################
+#      远程版本获取函数     #
+#############################
 download_version() {
     local version_url="https://api.github.com/repos/v2fly/v2ray-core/releases/latest"
-    version=$(curl -sSL "$version_url" | jq -r '.tag_name' | sed 's/v//') || { echo -e "${red}获取 v2ray 远程版本失败${reset}"; exit 1;}
+    version=$(curl -sSL "$version_url" | jq -r '.tag_name' | sed 's/v//') || {
+        echo -e "${red}获取 v2ray 远程版本失败${reset}";
+        exit 1;
+    }
 }
 
 download_v2ray() {
-    check_network
+    download_version
     local version_file="/root/v2ray/version.txt"
-    local filename
-    get_schema
-    download_version || { echo -e "${red}获取最新版本失败，请检查网络或源地址！${reset}"; start_menu; return; }
-    case "$arch" in
-        '64'|'32'|'arm64-v8a'|'arm32-v7a'|'s390x') filename="v2ray-linux-${arch}.zip" ;;
-        *) echo -e "${red}未知架构: ${arch}${reset}"; exit 1 ;;
-    esac
-    local download_url=$(get_url "https://github.com/v2fly/v2ray-core/releases/download/v${version}/${filename}")
-    wget -t 3 -T 30 "${download_url}" -O "${filename}" || { echo -e "${red}v2ray 下载失败，可能是网络问题，建议重新运行本脚本重试下载${reset}"; exit 1; }
-    unzip "$filename" && rm "$filename" || { echo -e "${red}v2ray 解压失败${reset}"; exit 1; }
+    local filename="v2ray-linux-${arch}.zip"
+    local download_url="https://github.com/v2fly/v2ray-core/releases/download/v${version}/${filename}"
+    wget -t 3 -T 30 -O "$filename" "$(get_url "$download_url")" || {
+        echo -e "${red}v2ray 下载失败，请检查网络后重试${reset}"
+        exit 1
+    }
+    unzip "$filename" && rm "$filename" || { 
+        echo -e "${red}v2ray 解压失败${reset}"
+        exit 1
+    }
     chmod +x v2ray
     echo "$version" > "$version_file"
 }
@@ -229,42 +462,56 @@ update_v2ray() {
     local current_version
     if [ -f "$version_file" ]; then
         current_version=$(cat "$version_file")
-    fi
-    if [ -z "$current_version" ]; then
-        read -p "$(echo -e "${yellow}未检测到版本信息，是否升级到最新版本？${reset} (y/n): ")" input
-        case "$input" in
-            [Yy]*) echo -e "${green}开始升级，升级中请等待${reset}" ;;
-            [Nn]*) echo -e "${yellow}取消升级，保持现有版本${reset}"; start_menu; return ;;
-            *) echo -e "${red}无效选择，升级已取消${reset}"; start_menu; return ;;
-        esac
     else
-        download_version || { echo -e "${red}获取最新版本失败，请检查网络或源地址！${reset}"; start_menu; return; }
-        local latest_version="$version"
-        if [ "$current_version" == "$latest_version" ]; then
-            echo -e "${green}当前已是最新，无需更新${reset}"
+        echo -e "${red}请先安装 v2ray${reset}"
+        start_menu
+        return
+    fi
+    download_version || {
+        echo -e "${red}获取最新版本失败，请检查网络或源地址！${reset}"
+        start_menu
+         return
+    }
+    local latest_version="$version"
+    if [ "$current_version" == "$latest_version" ]; then
+        echo -e "${green}当前已是最新，无需更新${reset}"
+        start_menu
+        return
+    fi
+    read -p "$(echo -e "${yellow}检查到有更新，是否升级到最新版本？${reset} (y/n): ")" input
+    case "$input" in
+        [Yy]* )
+            echo -e "${green}开始升级，升级中请等待${reset}"
+            ;;
+        [Nn]* )
+            echo -e "${yellow}取消升级，保持现有版本${reset}"
             start_menu
             return
-        fi
-        read -p "$(echo -e "${yellow}检查到有更新，是否升级到最新版本？${reset} (y/n): ")" input
-        case "$input" in
-            [Yy]*) echo -e "${green}开始升级，升级中请等待${reset}" ;;
-            [Nn]*) echo -e "${yellow}取消升级，保持现有版本${reset}"; start_menu; return ;;
-            *) echo -e "${red}无效选择，升级已取消${reset}"; start_menu; return ;;
-        esac
-    fi
-    download_v2ray|| { echo -e "${red}v2ray 下载失败，可能是网络问题，建议重新运行本脚本重试下载${reset}"; exit 1; }
-    local latest_version=$(cat /root/v2ray/version.txt)
+            ;;
+        * )
+            echo -e "${red}无效选择，升级已取消${reset}"
+            start_menu
+            return
+            ;;
+    esac
+    download_v2ray|| { 
+        echo -e "${red}v2ray 下载失败，请重试${reset}"
+        exit 1
+    }
     sleep 2s
     echo -e "${yellow}更新完成，当前版本已更新为：${reset}【 ${green}${latest_version}${reset} 】"
-    systemctl restart v2ray
+    service_restart
     start_menu
 }
 
+#############################
+#       脚本更新函数        #
+#############################
 update_shell() {
     check_network
     local shell_file="/usr/bin/v2ray"
-    local sh_ver_url="https://raw.githubusercontent.com/Abcd789JK/Tools/main/Script/v2ray/v2ray.sh"
-    local sh_new_ver=$(wget --no-check-certificate -qO- "$(get_url "$sh_ver_url")" | grep 'sh_ver="' | awk -F "=" '{print $NF}' | sed 's/\"//g' | head -1)
+    local sh_ver_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/v2ray/v2ray.sh"
+    local sh_new_ver=$(curl -sSL "$(get_url "$sh_ver_url")" | grep 'sh_ver="' | awk -F "=" '{print $NF}' | sed 's/\"//g' | head -1)
     echo -e "${green}开始检查脚本是否有更新${reset}"
     if [ "$sh_ver" == "$sh_new_ver" ]; then
         echo -e "${green}当前已是最新，无需更新${reset}"
@@ -273,12 +520,22 @@ update_shell() {
     fi
     read -p "$(echo -e "${yellow}检查到有更新，是否升级到最新版本？${reset} (y/n): ")" input
     case "$input" in
-        [Yy]* ) echo -e "${green}开始升级，升级中请等待${reset}";;
-        [Nn]* ) echo -e "${yellow}取消升级，保持现有版本${reset}"; start_menu; return;;
-        * ) echo -e "${red}无效选择，升级已取消${reset}"; start_menu; return;;
+        [Yy]* )
+            echo -e "${green}开始升级，升级中请等待${reset}"
+            ;;
+        [Nn]* )
+            echo -e "${yellow}取消升级，保持现有版本${reset}"
+            start_menu
+            return
+            ;;
+        * )
+            echo -e "${red}无效选择，升级已取消${reset}"
+            start_menu
+            return
+            ;;
     esac
     [ -f "$shell_file" ] && rm "$shell_file"
-    wget -O "$shell_file" --no-check-certificate "$(get_url "$sh_ver_url")"
+    wget -t 3 -T 30 -O "$shell_file" "$(get_url "$sh_ver_url")"
     chmod +x "$shell_file"
     hash -r
     echo -e "${yellow}更新完成，当前版本已更新为：${reset}【 ${green}${sh_new_ver}${reset} 】"
@@ -287,15 +544,19 @@ update_shell() {
     "$shell_file"
 }
 
+#############################
+#       配置管理函数       #
+#############################
 config_v2ray() {
     check_installation || { start_menu; return; }
     check_network
     local config_file="/root/v2ray/config.json"
-    local config_url=$(get_url "https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Config/v2ray.json")
-    curl -s -o "$config_file" "$config_url"
-    echo -e ""
+    local config_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Config/v2ray.json"
+    wget -t 3 -T 30 -q -O "$config_file" "$(get_url "$config_url")" || { 
+        echo -e "${red}配置文件下载失败${reset}"
+        exit 1
+    }
     echo -e "${green}开始配置 v2ray ${reset}"
-    echo -e ""
     read -rp "是否快速生成配置文件？(y/n 默认[y]): " confirm
     confirm=${confirm:-y}
     if [[ "$confirm" == [Yy] ]]; then
@@ -434,19 +695,14 @@ config_v2ray() {
         echo -e "${red}修改后的配置文件格式无效，请检查文件${reset}"
         exit 1
     fi
-    systemctl daemon-reload
-    systemctl restart v2ray
-    echo -e "${green}v2ray 配置完成，准备启动中${reset}"
-    echo -e ""
-    echo -e "${green}恭喜你，你的 v2ray 已成功启动并设置为开机自启，配置文件保存到 ${yellow}${config_file}${reset}"
-    echo -e ""
-    echo -e "${red}下面是 v2ray 进入管理菜单命令${reset}"
-    echo -e "${cyan}=========================${reset}"
-    echo -e "${yellow}v2ray          进入菜单 ${reset}"
-    echo -e "${cyan}=========================${reset}"
+    service_restart
+    echo -e "${green}配置完成${reset}"
     start_menu
 }
 
+#############################
+#           主菜单         #
+#############################
 menu() {
     clear
     echo "================================="
@@ -490,4 +746,6 @@ menu() {
     esac
 }
 
+# 程序入口：先检测系统类型，再进入主菜单
+check_distro
 menu

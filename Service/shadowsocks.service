@@ -3,7 +3,7 @@ Description=Shadowsocks Server
 After=network.target
 
 [Service]
-ExecStart=/root/shadowsocks/ssserver -c /root/shadowsocks/config.json
+ExecStart=/root/shadowsocks/shadowsocks -c /root/shadowsocks/config.json
 Restart=on-failure
 PIDFile=/run/shadowsocks.pid
 User=root

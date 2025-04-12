@@ -1,7 +1,7 @@
 #!/bin/bash
-#!name = shadowsocks 一键安装脚本 Beta
+#!name = ss 一键安装脚本 Beta
 #!desc = 安装 & 配置
-#!date = 2025-04-10 10:00:16
+#!date = 2025-04-11 20:01:09
 #!author = ChatGPT
 
 # 终止脚本执行遇到错误时退出，并启用管道错误检测
@@ -121,16 +121,16 @@ get_schema() {
     arch_raw=$(uname -m)
     case "$arch_raw" in
         x86_64)
-            arch="64"
+            arch="amd64"
             ;;
         x86|i686|i386)
-            arch="32"
+            arch="386"
             ;;
         aarch64|arm64)
-            arch="arm64-v8a"
+            arch="arm64"
             ;;
-        armv7|armv7l)
-            arch="arm32-v7a"
+        armv7l)
+            arch="armv7"
             ;;
         s390x)
             arch="s390x"
@@ -165,11 +165,18 @@ download_shadowsocks() {
         echo -e "${red}shadowsocks 下载失败，请检查网络后重试${reset}"
         exit 1
     }
-    tar -xJf "$filename" && rm "$filename" || { 
+    tar -xJf "$filename" || {
         echo -e "${red}shadowsocks 解压失败${reset}"
         exit 1
     }
-    chmod +x ssserver
+    if [ -f "ssserver" ]; then
+        mv "ssserver" shadowsocks
+    else
+        echo -e "${red}找不到解压后的 ssserver 文件${reset}"
+        exit 1
+    fi
+    rm -f "$filename"
+    chmod +x shadowsocks
     echo "$version" > "$version_file"
 }
 
@@ -202,8 +209,8 @@ download_service() {
 #    管理脚本下载函数      #
 #############################
 download_shell() {
-    local shell_file="/usr/bin/shadowsocks"
-    local sh_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/Beta/shadowrocket/shadowsocks.sh"
+    local shell_file="/usr/bin/ssr"
+    local sh_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/Beta/shadowsocks/shadowsocks.sh"
     [ -f "$shell_file" ] && rm -f "$shell_file"
     wget -t 3 -T 30 -O "$shell_file" "$(get_url "$sh_url")" || {
         echo -e "${red}管理脚本下载失败，请检查网络后重试${reset}"
@@ -214,8 +221,52 @@ download_shell() {
 }
 
 #############################
-#       安装主流程函数      #
+#       配置文件生成函数     #
 #############################
+enable_systfo() {
+    kernel_major=$(uname -r | cut -d. -f1)
+    if [ "$kernel_major" -ge 3 ]; then
+        # 开启 TCP Fast Open（若文件存在则设置值为 3）
+        if [ -f /proc/sys/net/ipv4/tcp_fastopen ]; then
+            echo 3 > /proc/sys/net/ipv4/tcp_fastopen
+        fi
+
+        # 定义 sysctl 配置文件路径
+        SYSCTL_CONF="/etc/sysctl.d/99-systfo.conf"
+        # 如果配置文件不存在，则写入网络优化参数
+        if [ ! -f "$SYSCTL_CONF" ]; then
+            cat <<EOF > "$SYSCTL_CONF"
+fs.file-max = 51200
+net.core.rmem_max = 67108864
+net.core.wmem_max = 67108864
+net.core.rmem_default = 65536
+net.core.wmem_default = 65536
+net.core.netdev_max_backlog = 4096
+net.core.somaxconn = 4096
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 30
+net.ipv4.tcp_keepalive_time = 1200
+net.ipv4.ip_local_port_range = 10000 65000
+net.ipv4.tcp_max_syn_backlog = 4096
+net.ipv4.tcp_max_tw_buckets = 5000
+net.ipv4.tcp_fastopen = 3
+net.ipv4.tcp_rmem = 4096 87380 67108864
+net.ipv4.tcp_wmem = 4096 65536 67108864
+net.ipv4.tcp_mtu_probing = 1
+net.ipv4.tcp_ecn = 1
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+EOF
+            # 应用配置
+            sysctl --system >/dev/null 2>&1
+        fi
+        echo -e "${Green_font_prefix}TCP Fast Open 已启用并应用网络优化参数${Font_color_suffix}"
+    else
+        echo -e "${Red_font_prefix}系统内核版本过低，无法支持 TCP Fast Open！${Font_color_suffix}"
+    fi
+}
+
 config_shadowsocks() {
     local config_file="/root/shadowsocks/config.json"
     local config_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Config/shadowsocks.json"
@@ -249,7 +300,7 @@ config_shadowsocks() {
             3) METHOD="chacha20-ietf-poly1305" ;;
             4) METHOD="2022-blake3-aes-128-gcm" ;;
             5) METHOD="2022-blake3-aes-256-gcm" ;;
-            6) METHOD="2022-blake3-chacha20-ietf-poly1305" ;;
+            6) METHOD="2022-blake3-chacha20-ietf-poly1305" ;;         
             *) METHOD="aes-128-gcm" ;;
         esac
 
@@ -292,16 +343,16 @@ config_shadowsocks() {
             3) METHOD="chacha20-ietf-poly1305" ;;
             4) METHOD="2022-blake3-aes-128-gcm" ;;
             5) METHOD="2022-blake3-aes-256-gcm" ;;
-            6) METHOD="2022-blake3-chacha20-ietf-poly1305" ;;
+            6) METHOD="2022-blake3-chacha20-ietf-poly1305" ;;         
             *) METHOD="aes-128-gcm" ;;
         esac
         
         echo -e "请选择认证模式："
         echo -e "${green}1${reset}、自定义密码"
         echo -e "${green}2${reset}、自动生成 UUID 当作密码"
-        read -rp "输入数字选择认证模式 (1-2 默认[1]): " auth_choice
+        read -rp "输入数字选择认证模式 (1-2 默认[2]): " auth_choice
         auth_choice=${auth_choice:-1}
-        if [[ "$auth_choice" == "1" ]]; then
+        if [[ "$auth_choice" == "2" ]]; then
             read -rp "请输入 Shadowsocks 密码 (留空则自动生成 UUID): " PASSWORD
             if [[ -z "$PASSWORD" ]]; then
                 PASSWORD=$(cat /proc/sys/kernel/random/uuid)
@@ -339,7 +390,7 @@ config_shadowsocks() {
     echo -e "${green}Shadowsocks 配置完成，正在启动中${reset}"
     echo -e "${red}管理命令${reset}"
     echo -e "${cyan}=========================${reset}"
-    echo -e "${green}命令: shadowsocks 进入管理菜单${reset}"
+    echo -e "${green}命令: ssr 进入管理菜单${reset}"
     echo -e "${cyan}=========================${reset}"
     echo -e "${green}Shadowsocks 已成功启动并设置为开机自启${reset}"
 }
@@ -347,11 +398,11 @@ config_shadowsocks() {
 #############################
 #       安装主流程函数      #
 #############################
-
 install_shadowsocks() {
     local folders="/root/shadowsocks"
-    [ -d "$folders" ] && rm -rf "$folders"
-    mkdir -p "$folders" && cd "$folders" 
+    rm -rf "$folders"
+    mkdir -p "$folders" && cd "$folders"
+    enable_systfo
     check_distro
     echo -e "${yellow}当前系统版本：${reset}[ ${green}${distro}${reset} ]"
     get_schema
@@ -362,7 +413,9 @@ install_shadowsocks() {
     download_service
     download_shell
     echo -e "${green}恭喜你! shadowsocks 已经安装完成${reset}"
-    echo -e "${red}输入 y/Y 生产配置文件${reset}"
+    echo -e "${red}输入 y/Y 下载默认配置${reset}"
+    echo -e "${red}输入 n/N 取消下载默认配置${reset}"
+    echo -e "${red}把你自己的配置上传到 ${folders} 目录下(文件名必须为 config.yaml)${reset}"
     read -p "$(echo -e "${yellow}请输入选择(y/n) [默认: y]: ${reset}")" confirm
     confirm=${confirm:-y}
     case "$confirm" in

@@ -2,7 +2,13 @@
 
 name="shadowsocks"
 description="Shadowsocks server"
-command="/root/shadowsocks/ssserver"
+
+command="/root/shadowsocks/shadowsocks"
 command_args="-c /root/shadowsocks/config.json"
 pidfile="/run/shadowsocks.pid"
 command_background=true
+
+depend() {
+    need net
+    after firewall
+}

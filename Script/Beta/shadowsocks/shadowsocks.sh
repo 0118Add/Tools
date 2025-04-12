@@ -1,7 +1,7 @@
 #!/bin/bash
-#!name = shadowsocks 一键管理脚本 Beta
+#!name = ss 一键管理脚本 Beta
 #!desc = 管理 & 面板
-#!date = 2025-04-10 10:00:16
+#!date = 2025-04-11 20:01:09
 #!author = ChatGPT
 
 # 当遇到错误或管道错误时立即退出
@@ -317,7 +317,7 @@ logs_shadowsocks()    { service_shadowsocks logs; }
 uninstall_shadowsocks() {
     check_installation || { start_menu; return; }
     local folders="/root/shadowsocks"
-    local shell_file="/usr/bin/shadowsocks"
+    local shell_file="/usr/bin/ss"
     local service_file="/etc/init.d/shadowsocks"
     local system_file="/etc/systemd/system/shadowsocks.service"
     read -p "$(echo -e "${red}警告：卸载后将删除当前配置和文件！\n${yellow}确认卸载 shadowsocks 吗？${reset} (y/n): ")" input
@@ -445,10 +445,17 @@ download_shadowsocks() {
         echo -e "${red}shadowsocks 下载失败，请检查网络后重试${reset}"
         exit 1
     }
-    tar -xJf "$filename" && rm "$filename" || { 
+    tar -xJf "$filename" || {
         echo -e "${red}shadowsocks 解压失败${reset}"
         exit 1
     }
+    if [ -f "ssserver" ]; then
+        mv "ssserver" shadowsocks
+    else
+        echo -e "${red}找不到解压后的 ssserver 文件${reset}"
+        exit 1
+    fi
+    rm -f "$filename"
     chmod +x shadowsocks
     echo "$version" > "$version_file"
 }
@@ -509,7 +516,7 @@ update_shadowsocks() {
 #############################
 update_shell() {
     check_network
-    local shell_file="/usr/bin/shadowsocks"
+    local shell_file="/usr/bin/ssr"
     local sh_ver_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/Beta/shadowsocks/shadowsocks.sh"
     local sh_new_ver=$(curl -sSL "$(get_url "$sh_ver_url")" | grep 'sh_ver="' | awk -F "=" '{print $NF}' | sed 's/\"//g' | head -1)
     echo -e "${green}开始检查脚本是否有更新${reset}"
@@ -580,7 +587,7 @@ config_shadowsocks() {
             3) METHOD="chacha20-ietf-poly1305" ;;
             4) METHOD="2022-blake3-aes-128-gcm" ;;
             5) METHOD="2022-blake3-aes-256-gcm" ;;
-            6) METHOD="2022-blake3-chacha20-ietf-poly1305" ;;
+            6) METHOD="2022-blake3-chacha20-ietf-poly1305" ;;         
             *) METHOD="aes-128-gcm" ;;
         esac
 
@@ -623,16 +630,16 @@ config_shadowsocks() {
             3) METHOD="chacha20-ietf-poly1305" ;;
             4) METHOD="2022-blake3-aes-128-gcm" ;;
             5) METHOD="2022-blake3-aes-256-gcm" ;;
-            6) METHOD="2022-blake3-chacha20-ietf-poly1305" ;;
+            6) METHOD="2022-blake3-chacha20-ietf-poly1305" ;;         
             *) METHOD="aes-128-gcm" ;;
         esac
         
         echo -e "请选择认证模式："
         echo -e "${green}1${reset}、自定义密码"
         echo -e "${green}2${reset}、自动生成 UUID 当作密码"
-        read -rp "输入数字选择认证模式 (1-2 默认[1]): " auth_choice
+        read -rp "输入数字选择认证模式 (1-2 默认[2]): " auth_choice
         auth_choice=${auth_choice:-1}
-        if [[ "$auth_choice" == "1" ]]; then
+        if [[ "$auth_choice" == "2" ]]; then
             read -rp "请输入 Shadowsocks 密码 (留空则自动生成 UUID): " PASSWORD
             if [[ -z "$PASSWORD" ]]; then
                 PASSWORD=$(cat /proc/sys/kernel/random/uuid)
@@ -658,13 +665,14 @@ config_shadowsocks() {
     
     echo -e "${green}写入配置文件${reset}"
     echo "$config" > "$config_file"
+    
     echo -e "${green}验证修改后的配置文件格式${reset}"
     if ! jq . "$config_file" >/dev/null 2>&1; then
         echo -e "${red}修改后的配置文件格式无效，请检查文件${reset}"
         exit 1
     fi
+    
     service_restart
-    echo -e "${green}配置完成${reset}"
     start_menu
 }
 
