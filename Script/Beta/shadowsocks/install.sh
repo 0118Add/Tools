@@ -1,7 +1,7 @@
 #!/bin/bash
 #!name = ss 一键安装脚本 Beta
 #!desc = 安装 & 配置
-#!date = 2025-04-15 11:34:37
+#!date = 2025-04-15 13:34:54
 #!author = ChatGPT
 
 # 终止脚本执行遇到错误时退出，并启用管道错误检测
@@ -22,7 +22,7 @@ reset="\033[0m"   # 重置颜色
 #############################
 sh_ver="1.0.0"
 use_cdn=false
-distro="unknown"  # 系统类型：debian, ubuntu, alpine, fedora
+distro="unknown"  # 系统类型
 arch=""           # 系统架构
 arch_raw=""       # 原始架构信息
 
@@ -229,18 +229,13 @@ enable_systfo() {
     if [ "$kernel_major" -ge 3 ]; then
         if [ -f /proc/sys/net/ipv4/tcp_fastopen ]; then
             if echo 3 > /proc/sys/net/ipv4/tcp_fastopen; then
-            else
-                echo -e "${red}错误：无法设置 TCP Fast Open${reset}" >&2
             fi
-        else
-            echo -e ""
         fi
         if [ -d /etc/sysctl.d ]; then
             sysctl_conf="/etc/sysctl.d/99-systfo.conf"
         else
             sysctl_conf="/etc/sysctl.conf"
         fi
-
         if [ ! -f "$sysctl_conf" ]; then
             cat <<'EOF' > "$sysctl_conf"
 fs.file-max = 51200
@@ -267,19 +262,11 @@ net.ipv4.tcp_congestion_control = bbr
 EOF
             if [ "$distro" = "alpine" ]; then
                 if sysctl -p "$sysctl_conf" >/dev/null 2>&1; then
-                    echo -e ""
-                else
-                    echo -e "${red}错误：网络优化参数应用失败${reset}" >&2
                 fi
             else
                 if sysctl --system >/dev/null 2>&1; then
-                    echo -e ""
-                else
-                    echo -e "${red}错误：网络优化参数应用失败${reset}" >&2
                 fi
             fi
-        else
-            echo -e ""
         fi
     else
         echo -e "${red}系统内核版本过低，无法支持 TCP Fast Open！${reset}"
@@ -296,57 +283,43 @@ config_shadowsocks() {
         echo -e "${red}配置文件下载失败${reset}"
         exit 1
     }
+    select_protocol() {
+        echo -e "请选择加密方式："
+        echo -e "${green}1${reset}、aes-128-gcm"
+        echo -e "${green}2${reset}、aes-256-gcm"
+        echo -e "${green}3${reset}、chacha20-ietf-poly1305"
+        echo -e "${green}4${reset}、2022-blake3-aes-128-gcm"
+        echo -e "${green}5${reset}、2022-blake3-aes-256-gcm"
+        echo -e "${green}6${reset}、2022-blake3-chacha20-ietf-poly1305"
+        read -rp "输入数字选择加密方式 (1-6 默认[1]): " confirm
+        confirm=${confirm:-1}
+        case $confirm in
+            1) method="aes-128-gcm" ;;
+            2) method="aes-256-gcm" ;;
+             3) method="chacha20-ietf-poly1305" ;;
+            4) method="2022-blake3-aes-128-gcm" ;;
+            5) method="2022-blake3-aes-256-gcm" ;;
+            6) method="2022-blake3-chacha20-ietf-poly1305" ;;
+            *) method="aes-128-gcm" ;;
+        esac
+    }
     echo -e "${green}开始配置 Shadowsocks ${reset}"
     read -rp "是否快速生成配置文件？(y/n 默认[y]): " mode
     mode=${mode:-y}
     if [[ "$mode" == [Yy] ]]; then
-        echo -e "请选择加密方式"
-        echo -e "${green}1${reset}. aes-128-gcm"
-        echo -e "${green}2${reset}. aes-256-gcm"
-        echo -e "${green}3${reset}. chacha20-ietf-poly1305"
-        echo -e "${green}4${reset}. 2022-blake3-aes-128-gcm"
-        echo -e "${green}5${reset}. 2022-blake3-aes-256-gcm"
-        echo -e "${green}6${reset}. 2022-blake3-chacha20-ietf-poly1305"
-        read -rp "输入数字选择加密方式 (1-6 默认[1]): " confirm
-        confirm=${confirm:-1}
-        case $confirm in
-            1) method="aes-128-gcm" ;;
-            2) method="aes-256-gcm" ;;
-            3) method="chacha20-ietf-poly1305" ;;
-            4) method="2022-blake3-aes-128-gcm" ;;
-            5) method="2022-blake3-aes-256-gcm" ;;
-            6) method="2022-blake3-chacha20-ietf-poly1305" ;;         
-            *) method="aes-128-gcm" ;;
-        esac
+        select_protocol
         port=$(shuf -i 10000-65000 -n 1)
         password=$(cat /proc/sys/kernel/random/uuid)
     else
-        echo -e "请选择加密方式"
-        echo -e "${green}1${reset}. aes-128-gcm"
-        echo -e "${green}2${reset}. aes-256-gcm"
-        echo -e "${green}3${reset}. chacha20-ietf-poly1305"
-        echo -e "${green}4${reset}. 2022-blake3-aes-128-gcm"
-        echo -e "${green}5${reset}. 2022-blake3-aes-256-gcm"
-        echo -e "${green}6${reset}. 2022-blake3-chacha20-ietf-poly1305"
-        read -rp "输入数字选择加密方式 (1-6 默认[1]): " confirm
-        confirm=${confirm:-1}
-        case $confirm in
-            1) method="aes-128-gcm" ;;
-            2) method="aes-256-gcm" ;;
-            3) method="chacha20-ietf-poly1305" ;;
-            4) method="2022-blake3-aes-128-gcm" ;;
-            5) method="2022-blake3-aes-256-gcm" ;;
-            6) method="2022-blake3-chacha20-ietf-poly1305" ;;         
-            *) method="aes-128-gcm" ;;
-        esac
+        select_protocol
         read -p "请输入监听端口 (留空以随机生成端口): " port
         if [[ -z "$port" ]]; then
             port=$(shuf -i 10000-65000 -n 1)
         elif [[ "$port" -lt 10000 || "$port" -gt 65000 ]]; then
             echo -e "${red}端口号必须在10000到65000之间。${reset}"
-            exit 1
+            start_menu
         fi
-        read -p "请输入 Shadowsocks 的密码 (留空则自动生成 UUID): " password
+        read -p "请输入新的 Shadowsocks 密码 (留空则自动生成 uuid): " password
         if [[ -z "$password" ]]; then
             password=$(cat /proc/sys/kernel/random/uuid)
         fi
