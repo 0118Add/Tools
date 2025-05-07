@@ -49,7 +49,11 @@ proxies:
   - {name: "中国 01", type: direct, udp: true}
 
 ##### 全局设置配置 #####
-mixed-port: 7890
+port: 7890
+socks-port: 7891
+redir-port: 7892
+mixed-port: 7893
+tproxy-port: 7894
 ipv6: true
 allow-lan: true
 unified-delay: true
@@ -58,7 +62,7 @@ tcp-concurrent: true
 # ui 配置
 external-ui: ui
 external-controller: 0.0.0.0:9090
-external-ui-url: "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip"
+external-ui-url: "https://github.com/Zephyruso/zashboard/archive/refs/heads/gh-pages.zip"
 
 find-process-mode: strict
 global-client-fingerprint: chrome
