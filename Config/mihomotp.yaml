@@ -13,14 +13,17 @@ proxies:
 
 ipv6: true
 allow-lan: true
-mixed-port: 7890
-tproxy-port: 7891
+port: 7890
+socks-port: 7891
+redir-port: 7892
+mixed-port: 7893
+tproxy-port: 7894
 unified-delay: true
 tcp-concurrent: true
 
 external-ui: ui
 external-controller: 0.0.0.0:9090
-external-ui-url: "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip"
+external-ui-url: "https://github.com/Zephyruso/zashboard/archive/refs/heads/gh-pages.zip"
  
 find-process-mode: strict
 global-client-fingerprint: chrome
@@ -80,10 +83,6 @@ proxy-groups:
     proxies: [默认,香港,台湾,日本,新加坡,美国,其它地区,全部节点,自动选择,直连]
 
   - name: Twitter
-    type: select
-    proxies: [默认,香港,台湾,日本,新加坡,美国,其它地区,全部节点,自动选择,直连]
-
-  - name: 哔哩哔哩
     type: select
     proxies: [默认,香港,台湾,日本,新加坡,美国,其它地区,全部节点,自动选择,直连]
 
@@ -171,7 +170,6 @@ rules:
   - RULE-SET,google_domain,Google
   - RULE-SET,telegram_domain,Telegram
   - RULE-SET,netflix_domain,NETFLIX
-  - RULE-SET,bilibili_domain,哔哩哔哩
   - RULE-SET,bahamut_domain,巴哈姆特
   - RULE-SET,spotify_domain,Spotify
   - RULE-SET,cn_domain,国内
@@ -218,9 +216,6 @@ rule-providers:
   netflix_domain:
     <<: *domain
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/netflix.mrs"
-  bilibili_domain:
-    <<: *domain
-    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/bilibili.mrs"
   bahamut_domain:
     <<: *domain
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/bahamut.mrs"
