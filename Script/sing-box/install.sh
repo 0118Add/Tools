@@ -1,65 +1,58 @@
 #!/bin/bash
-#!name = v2ray 一键安装脚本
-#!desc = 安装 & 配置
-#!date = 2025-04-26 14:59:18
-#!author = ChatGPT
 
-# 终止脚本执行遇到错误时退出，并启用管道错误检测
-set -e -o pipefail
+# ---------------------------------
+# script : sing-box 一键安装脚本
+# desc   : 安装 Xray 或 sing-box，支持多种安全协议（VMess, Shadowsocks, VLESS, Trojan, Hysteria2）
+# date   : 2025-06-08 11:07:07
+# author : Grok 3
+# ---------------------------------
 
-#############################
-#         颜色变量         #
-#############################
-red="\033[31m"    # 红色
-green="\033[32m"  # 绿色
-yellow="\033[33m" # 黄色
-blue="\033[34m"   # 蓝色
-cyan="\033[36m"   # 青色
-reset="\033[0m"   # 重置颜色
+# 颜色定义
+red='\033[0;31m'
+green='\033[0;32m'
+reset='\033[0m'
 
-#############################
-#       全局变量定义       #
-#############################
-sh_ver="1.0.0"    # 脚本版本
-use_cdn=false     # 代理加速
-distro="unknown"  # 系统类型
-arch=""           # 系统架构
-arch_raw=""       # 原始架构信息
+# 配置参数
+CONFIG_XRAY="/usr/local/etc/xray/config.json"
+CONFIG_SB="/etc/sing-box/config.json"
+SB="/usr/bin/sing-box"
+XRAY="/usr/local/bin/xray"
+UUID=$(uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid)
+CERT_DIR="/etc/ssl/sing-box"
+CERT_FILE="$CERT_DIR/cert.pem"
+KEY_FILE="$CERT_DIR/key.pem"
+DOWNLOAD_DIR="/tmp"
+CONFIG_DOWNLOAD="$DOWNLOAD_DIR/config-$(date +%Y%m%d%H%M%S).json"
 
-#############################
-#       系统检测函数       #
-#############################
+# 随机 WebSocket 路径（6位随机大小写字母和数字）
+generate_ws_path() {
+    WS_PATH="/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 6)"
+}
+
+# 函数定义
+check_root() {
+    if [ "$EUID" -ne 0 ]; then
+        echo -e "${red}本脚本需要以 root 用户执行，请使用 sudo 或以 root 用户执行。${reset}"
+        exit 1
+    fi
+}
+
+# 判断系统
 check_distro() {
     if [ -f /etc/os-release ]; then
         . /etc/os-release
         case "$ID" in
             debian|ubuntu)
                 distro="$ID"
-                pkg_update="apt update && apt upgrade -y"
-                pkg_install="apt install -y"
-                service_enable() { systemctl enable v2ray; }
-                service_restart() { systemctl daemon-reload; systemctl start v2ray; }
+                PKG_UPDATE="apt update && apt upgrade -y"
+                PKG_INSTALL="apt install -y"
+                UUID_PKG="uuid-runtime"
                 ;;
-            alpine)
-                distro="alpine"
-                pkg_update="apk update && apk upgrade"
-                pkg_install="apk add"
-                service_enable() { rc-update add v2ray default; }
-                service_restart() { rc-service v2ray restart; }
-                ;;
-            fedora)
-                distro="fedora"
-                pkg_update="dnf upgrade --refresh -y"
-                pkg_install="dnf install -y"
-                service_enable() { systemctl enable v2ray; }
-                service_restart() { systemctl daemon-reload; systemctl start v2ray; }
-                ;;
-            arch)
-                distro="arch"
-                pkg_update="pacman -Syu --noconfirm"
-                pkg_install="pacman -S --noconfirm"
-                service_enable() { systemctl enable v2ray; }
-                service_restart() { systemctl daemon-reload; systemctl start v2ray; }
+            centos|rhel|fedora)
+                distro="$ID"
+                PKG_UPDATE="yum update -y || dnf update -y"
+                PKG_INSTALL="yum install -y || dnf install -y"
+                UUID_PKG="libuuid"
                 ;;
             *)
                 echo -e "${red}不支持的系统：${ID}${reset}"
@@ -72,341 +65,806 @@ check_distro() {
     fi
 }
 
-#############################
-#       网络检测函数       #
-#############################
+# 检查网络连接
 check_network() {
-    if ! curl -sI --connect-timeout 1 https://www.google.com > /dev/null; then
-        use_cdn=true
+    if ! ping -c 1 8.8.8.8 >/dev/null 2>&1; then
+        echo -e "${red}无法连接到网络，请检查网络设置。${reset}"
+        exit 1
     fi
 }
 
-#############################
-#        URL 处理函数       #
-#############################
-get_url() {
-    local url=$1
-    local final_url
-    if [ "$use_cdn" = true ]; then
-        final_url="https://gh-proxy.com/$url"
-        if ! curl --silent --head --fail --connect-timeout 3 -L "$final_url" -o /dev/null; then
-            final_url="https://github.boki.moe/$url"
+# 更新系统 & 安装必要工具
+update_system() {
+    echo "更新系统并安装必要工具..."
+    eval "$PKG_UPDATE"
+    eval "$PKG_INSTALL curl git gzip wget nano iptables tzdata jq unzip yq openssl net-tools $UUID_PKG"
+    if [[ $? -ne 0 ]]; then
+        echo -e "${red}依赖安装失败，请检查网络或包管理器配置。${reset}"
+        echo -e "${red}建议：确保包管理器源有效（例如，Debian/Ubuntu 检查 /etc/apt/sources.list）。${reset}"
+        exit 1
+    fi
+    if ! command -v uuidgen >/dev/null 2>&1 && [ ! -f /proc/sys/kernel/random/uuid ]; then
+        echo -e "${red}无法生成 UUID，uuidgen 安装失败且缺少 /proc/sys/kernel/random/uuid。${reset}"
+        exit 1
+    fi
+}
+
+# 检查端口是否被占用
+check_port() {
+    local port=$1
+    echo "检查端口 $port 是否可用..."
+    if command -v ss >/dev/null 2>&1; then
+        if ss -tuln | grep -q ":$port\b"; then
+            echo "端口 $port 被占用（ss 检测）。"
+            return 1
+        fi
+    elif command -v netstat >/dev/null 2>&1; then
+        if netstat -tuln | grep -q ":$port\b"; then
+            echo "端口 $port 被占用（netstat 检测）。"
+            return 1
         fi
     else
-        final_url="$url"
+        echo -e "${red}未找到 ss 或 netstat，假设端口 $port 可用，但可能不准确。${reset}"
+        return 0
     fi
-    if ! curl --silent --head --fail --connect-timeout 3 -L "$final_url" -o /dev/null; then
-        echo -e "${red}连接失败，可能是网络或代理站点不可用，请检查后重试！${reset}" >&2
+    echo "端口 $port 可用。"
+    return 0
+}
+
+# 生成不冲突的随机端口
+generate_port() {
+    local max_attempts=50
+    local attempt=1
+    while [ $attempt -le $max_attempts ]; do
+        PORT=$((RANDOM % 40001 + 20000))  # 20000-60000
+        if check_port $PORT; then
+            echo "使用端口: $PORT"
+            return 0
+        fi
+        ((attempt++))
+    done
+    echo -e "${red}无法找到可用端口，请检查端口范围或系统状态。${reset}"
+    echo -e "${red}建议：使用 'ss -tuln' 或 'netstat -tuln' 检查端口占用，或释放 20000-60000 范围内的端口。${reset}"
+    exit 1
+}
+
+# 生成自签名证书
+generate_cert() {
+    if [[ "$USE_TLS" == "y" && ( ! -f "$CERT_FILE" || ! -f "$KEY_FILE" ) ]]; then
+        echo "生成自签名证书..."
+        mkdir -p "$CERT_DIR"
+        DOMAINS=("xiaomi.com" "apple.com" "bing.com" "google.com" "microsoft.com")
+        RANDOM_DOMAIN=${DOMAINS[$RANDOM % ${#DOMAINS[@]}]}
+        openssl req -x509 -newkey rsa:2048 -nodes -days 365 -keyout "$KEY_FILE" -out "$CERT_FILE" -subj "/CN=$RANDOM_DOMAIN" >/dev/null 2>&1
+        if [[ $? -ne 0 ]]; then
+            echo -e "${red}证书生成失败，请检查 openssl 配置。${reset}"
+            exit 1
+        fi
+        chmod 600 "$KEY_FILE"
+        chmod 644 "$CERT_FILE"
+        echo "使用域名 $RANDOM_DOMAIN 生成证书"
+    fi
+}
+
+# 安装 Xray
+install_xray() {
+    if ! command -v xray &> /dev/null; then
+        echo "安装 Xray..."
+        bash -c "$(curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+        if [[ $? -ne 0 ]]; then
+            echo -e "${red}Xray 安装失败，请检查错误信息并重试。${reset}"
+            exit 1
+        fi
+    else
+        echo "Xray 已安装，跳过。"
+    fi
+}
+
+# 安装 sing-box
+install_singbox() {
+    if ! command -v sing-box &> /dev/null; then
+        echo "安装 sing-box..."
+        if ! command -v curl >/dev/null 2>&1; then
+            echo -e "${red}curl 未安装，请确保 curl 已正确安装。${reset}"
+            exit 1
+        fi
+        echo "正在下载 sing-box 安装脚本..."
+        if ! curl -fsSL https://sing-box.app/install.sh -o /tmp/sing-box-install.sh; then
+            echo -e "${red}无法下载 sing-box 安装脚本，请检查网络或 URL 是否有效。${reset}"
+            exit 1
+        fi
+        echo "执行 sing-box 安装脚本..."
+        if ! bash /tmp/sing-box-install.sh > /tmp/sing-box-install.log 2>&1; then
+            echo -e "${red}sing-box 安装失败，错误日志如下：${reset}"
+            cat /tmp/sing-box-install.log
+            echo -e "${red}请检查以上错误信息并重试。${reset}"
+            rm -f /tmp/sing-box-install.sh /tmp/sing-box-install.log
+            exit 1
+        fi
+        rm -f /tmp/sing-box-install.sh /tmp/sing-box-install.log
+    else
+        echo "sing-box 已安装，跳过。"
+    fi
+}
+
+# 生成 Shadowsocks 密码
+generate_ss_password() {
+    case $SS_METHOD in
+        "2022-blake3-aes-256-gcm"|"2022-blake3-chacha20-poly1305")
+            PASSWORD=$(openssl rand -base64 32)
+            ;;
+        "2022-blake3-aes-128-gcm")
+            PASSWORD=$(openssl rand -base64 16)
+            ;;
+        *)
+            PASSWORD=$(openssl rand -base64 12)
+            ;;
+    esac
+}
+
+# 验证配置文件
+validate_config() {
+    local config_file=$1
+    if [[ ! -f "$config_file" ]]; then
+        echo -e "${red}配置文件 $config_file 不存在${reset}"
         return 1
     fi
-    echo "$final_url"
-}
-
-#############################
-#    系统更新及安装函数    #
-#############################
-update_system() {
-    eval "$pkg_update"
-    eval "$pkg_install curl git gzip wget nano iptables tzdata jq unzip"
-}
-
-#############################
-#     系统架构检测函数     #
-#############################
-get_schema() {
-    arch_raw=$(uname -m)
-    case "$arch_raw" in
-        x86_64)
-            arch="64"
-            ;;
-        x86|i686|i386)
-            arch="32"
-            ;;
-        aarch64|arm64)
-            arch="arm64-v8a"
-            ;;
-        armv7|armv7l)
-            arch="arm32-v7a"
-            ;;
-        s390x)
-            arch="s390x"
-            ;;
-        *)
-            echo -e "${red}不支持的架构：${arch_raw}${reset}"
-            exit 1
-            ;;
-    esac
-}
-
-#############################
-#      远程版本获取函数     #
-#############################
-download_version() {
-    local version_url="https://api.github.com/repos/v2fly/v2ray-core/releases/latest"
-    version=$(curl -sSL "$version_url" | jq -r '.tag_name' | sed 's/v//') || {
-        echo -e "${red}获取 v2ray 远程版本失败${reset}";
-        exit 1;
-    }
-}
-
-#############################
-#     v2ray 下载函数      #
-#############################
-download_v2ray() {
-    download_version
-    local version_file="/root/v2ray/version.txt"
-    local filename="v2ray-linux-${arch}.zip"
-    local download_url="https://github.com/v2fly/v2ray-core/releases/download/v${version}/${filename}"
-    wget -t 3 -T 30 -O "$filename" "$(get_url "$download_url")" || {
-        echo -e "${red}v2ray 下载失败，请检查网络后重试${reset}"
-        exit 1
-    }
-    unzip "$filename" && rm "$filename" || { 
-        echo -e "${red}v2ray 解压失败${reset}"
-        exit 1
-    }
-    chmod +x v2ray
-    echo "$version" > "$version_file"
-}
-
-#############################
-#   系统服务配置下载函数    #
-#############################
-download_service() {
-    if [ "$distro" = "alpine" ]; then
-        local service_file="/etc/init.d/v2ray"
-        local service_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Service/v2ray.openrc"
-        wget -t 3 -T 30 -O "$service_file" "$(get_url "$service_url")" || {
-            echo -e "${red}系统服务下载失败，请检查网络后重试${reset}"
-            exit 1
-        }
-        chmod +x "$service_file"
-        service_enable
-    else
-        local service_file="/etc/systemd/system/v2ray.service"
-        local service_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Service/v2ray.service"
-        wget -t 3 -T 30 -O "$service_file" "$(get_url "$service_url")" || {
-            echo -e "${red}系统服务下载失败，请检查网络后重试${reset}"
-            exit 1
-        }
-        chmod +x "$service_file"
-        service_enable
-    fi
-}
-
-#############################
-#    管理脚本下载函数      #
-#############################
-download_shell() {
-    local shell_file="/usr/bin/v2ray"
-    local sh_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/v2ray/v2ray.sh"
-    [ -f "$shell_file" ] && rm -f "$shell_file"
-    wget -t 3 -T 30 -O "$shell_file" "$(get_url "$sh_url")" || {
-        echo -e "${red}管理脚本下载失败，请检查网络后重试${reset}"
-        exit 1
-    }
-    chmod +x "$shell_file"
-    hash -r
-}
-
-#############################
-#       安装主流程函数      #
-#############################
-config_v2ray() {
-    local config_file="/root/v2ray/config.json"
-    local config_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Config/v2ray.json"
-    wget -t 3 -T 30 -q -O "$config_file" "$(get_url "$config_url")" || { 
-        echo -e "${red}配置文件下载失败${reset}"
-        exit 1
-    }
-    echo -e "${green}开始配置 v2ray ${reset}"
-    read -rp "是否快速生成配置文件？(y/n 默认[y]): " confirm
-    confirm=${confirm:-y}
-    if [[ "$confirm" == [Yy] ]]; then
-        echo -e "请选择协议："
-        echo -e "${green}1${reset}、vmess+tcp"
-        echo -e "${green}2${reset}、vmess+ws"
-        echo -e "${green}3${reset}、vmess+tcp+tls"
-        echo -e "${green}4${reset}、vmess+ws+tls"
-        read -rp "输入数字选择协议 (1-4 默认[1]): " confirm
-        confirm=${confirm:-1}
-        PORT=$(shuf -i 10000-65000 -n 1)
-        UUID=$(cat /proc/sys/kernel/random/uuid)
-        if [[ "$confirm" == "2" || "$confirm" == "4" ]]; then
-            WS_PATH=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 12)
-        fi
-        echo -e "配置文件已生成："
-        case $confirm in
-            1) echo -e "  - 协议: ${green}vmess+tcp${reset}" ;;
-            2) echo -e "  - 协议: ${green}vmess+ws${reset}" ;;
-            3) echo -e "  - 协议: ${green}vmess+tcp+tls${reset}" ;;
-            4) echo -e "  - 协议: ${green}vmess+ws+tls${reset}" ;;
-            *) echo -e "${red}无效选项${reset}" && exit 1 ;;
-        esac
-        echo -e "  - 端口: ${green}$PORT${reset}"
-        echo -e "  - UUID: ${green}$UUID${reset}"
-        if [[ "$confirm" == "2" || "$confirm" == "4" ]]; then
-            echo -e "  - WS路径: ${green}/$WS_PATH${reset}"
-        fi
-    else
-        echo -e "请选择协议："
-        echo -e "${green}1${reset}、vmess+tcp"
-        echo -e "${green}2${reset}、vmess+ws"
-        echo -e "${green}3${reset}、vmess+tcp+tls"
-        echo -e "${green}4${reset}、vmess+ws+tls"
-        read -rp "输入数字选择协议 (1-4 默认[1]): " confirm
-        confirm=${confirm:-1}
-        read -p "请输入监听端口 (留空以随机生成端口): " PORT
-        if [[ -z "$PORT" ]]; then
-            PORT=$(shuf -i 10000-65000 -n 1)
-        elif [[ "$PORT" -lt 10000 || "$PORT" -gt 65000 ]]; then
-            echo -e "${red}端口号必须在10000到65000之间。${reset}"
-            exit 1
-        fi
-        read -p "请输入 v2ray UUID (留空以生成随机UUID): " UUID
-        if [[ -z "$UUID" ]]; then
-            UUID=$(cat /proc/sys/kernel/random/uuid)
-        fi
-        if [[ "$confirm" == "2" || "$confirm" == "4" ]]; then
-            read -p "请输入 WebSocket 路径 (留空以生成随机路径): " WS_PATH
-            if [[ -z "$WS_PATH" ]]; then
-                WS_PATH=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 10)
-            else
-                WS_PATH="${WS_PATH#/}"
-            fi
-        fi
-        echo -e "配置文件已生成："
-        case $confirm in
-            1) echo -e "  - 协议: ${green}vmess+tcp${reset}" ;;
-            2) echo -e "  - 协议: ${green}vmess+ws${reset}" ;;
-            3) echo -e "  - 协议: ${green}vmess+tcp+tls${reset}" ;;
-            4) echo -e "  - 协议: ${green}vmess+ws+tls${reset}" ;;
-            *) echo -e "${red}无效选项${reset}" && exit 1 ;;
-        esac
-        echo -e "  - 端口: ${green}$PORT${reset}"
-        echo -e "  - UUID: ${green}$UUID${reset}"
-        if [[ "$confirm" == "2" || "$confirm" == "4" ]]; then
-            echo -e "  - WS路径: ${green}/$WS_PATH${reset}"
-        fi
-    fi
-    echo -e "${green}读取配置文件${reset}"
-    config=$(cat "$config_file")
-    echo -e "${green}修改配置文件${reset}"
-    case $confirm in
-        1)  # vmess + tcp
-            config=$(echo "$config" | jq --arg port "$PORT" --arg uuid "$UUID" '
-                .inbounds[0].port = ($port | tonumber) |
-                .inbounds[0].settings.clients[0].id = $uuid |
-                .inbounds[0].streamSettings.network = "tcp" |
-                del(.inbounds[0].streamSettings.wsSettings) |
-                del(.inbounds[0].streamSettings.tlsSettings)
-            ')
-            ;;
-        2)  # vmess + ws
-            config=$(echo "$config" | jq --arg port "$PORT" --arg uuid "$UUID" --arg ws_path "/$WS_PATH" '
-                .inbounds[0].port = ($port | tonumber) |
-                .inbounds[0].settings.clients[0].id = $uuid |
-                .inbounds[0].streamSettings.network = "ws" |
-                .inbounds[0].streamSettings.wsSettings.path = $ws_path |
-                del(.inbounds[0].streamSettings.tlsSettings) |
-                del(.inbounds[0].streamSettings.wsSettings.headers)
-            ')
-            ;;
-        3)  # vmess + tcp + tls
-            config=$(echo "$config" | jq --arg port "$PORT" --arg uuid "$UUID" '
-                .inbounds[0].port = ($port | tonumber) |
-                .inbounds[0].settings.clients[0].id = $uuid |
-                .inbounds[0].streamSettings.network = "tcp" |
-                .inbounds[0].streamSettings.security = "tls" |
-                .inbounds[0].streamSettings.tlsSettings = {
-                    "certificates": [
-                        {
-                            "certificateFile": "/root/ssl/server.crt",
-                            "keyFile": "/root/ssl/server.key"
-                        }
-                    ]
-                }
-            ')
-            ;;
-        4)  # vmess + ws + tls
-            config=$(echo "$config" | jq --arg port "$PORT" --arg uuid "$UUID" --arg ws_path "/$WS_PATH" '
-                .inbounds[0].port = ($port | tonumber) |
-                .inbounds[0].settings.clients[0].id = $uuid |
-                .inbounds[0].streamSettings.network = "ws" |
-                .inbounds[0].streamSettings.wsSettings.path = $ws_path |
-                .inbounds[0].streamSettings.security = "tls" |
-                .inbounds[0].streamSettings.tlsSettings = {
-                    "certificates": [
-                        {
-                            "certificateFile": "/root/ssl/server.crt",
-                            "keyFile": "/root/ssl/server.key"
-                        }
-                    ]
-                } |
-                del(.inbounds[0].streamSettings.wsSettings.headers)
-            ')
-            ;;
-        *)
-            echo -e "${red}无效选项${reset}"
-            exit 1
-            ;;
-    esac
-    echo -e "${green}写入配置文件${reset}"
-    echo "$config" > "$config_file"
-    echo -e "${green}验证修改后的配置文件格式${reset}"
     if ! jq . "$config_file" >/dev/null 2>&1; then
-        echo -e "${red}修改后的配置文件格式无效，请检查文件${reset}"
-        exit 1
+        echo -e "${red}配置文件 $config_file 格式无效${reset}"
+        return 1
     fi
-    service_restart
-    echo -e "${green}v2ray 配置已完成并保存到 ${config_file} 文件夹${reset}"
-    echo -e "${green}v2ray 配置完成，正在启动中${reset}"
-    echo -e "${red}管理命令${reset}"
-    echo -e "${cyan}=========================${reset}"
-    echo -e "${green}命令: v2ray 进入管理菜单${reset}"
-    echo -e "${cyan}=========================${reset}"
-    echo -e "${green}v2ray 已成功启动并设置为开机自启${reset}"
+    return 0
 }
 
-#############################
-#       安装主流程函数      #
-#############################
+# 下载配置文件
+download_config() {
+    local config_file=$1
+    cp "$config_file" "$CONFIG_DOWNLOAD"
+    echo "配置文件已保存至: $CONFIG_DOWNLOAD"
+    echo "可以通过以下方式下载："
+    echo "- 本地: cp $CONFIG_DOWNLOAD /your/destination/path"
+    echo "- 远程: scp root@$(hostname -I | awk '{print $1}'):$CONFIG_DOWNLOAD /your/local/path"
+    echo "- 或者使用 HTTP (需安装 web 服务器)："
+    echo "  1. 安装 web 服务器：$PKG_INSTALL nginx"
+    echo "  2. 复制到 web 目录：cp $CONFIG_DOWNLOAD /var/www/html/"
+    echo "  3. 下载：curl http://$(hostname -I | awk '{print $1')}/$(basename $CONFIG_DOWNLOAD)"
+}
 
-install_v2ray() {
-    local folders="/root/v2ray"
-    [ -d "$folders" ] && rm -rf "$folders"
-    mkdir -p "$folders" && cd "$folders" 
-    check_distro
-    echo -e "${yellow}当前系统版本：${reset}[ ${green}${distro}${reset} ]"
-    get_schema
-    echo -e "${yellow}当前系统架构：${reset}[ ${green}${arch_raw}${reset} ]"
-    download_version
-    echo -e "${yellow}当前软件版本：${reset}[ ${green}${version}${reset} ]"
-    download_v2ray
-    download_service
-    download_shell
-    echo -e "${green}恭喜你! v2ray 已经安装完成${reset}"
-    echo -e "${red}输入 y/Y 生产配置文件${reset}"
-    read -p "$(echo -e "${yellow}请输入选择(y/n) [默认: y]: ${reset}")" confirm
-    confirm=${confirm:-y}
-    case "$confirm" in
-        [Yy]*)
-            config_v2ray
+# 卸载服务
+uninstall_service() {
+    echo "请选择要卸载的内核："
+    echo "1. Xray"
+    echo "2. Sing-Box"
+    read -p "请输入选项 (1-2): " uninstall_choice
+    case $uninstall_choice in
+        1)
+            SERVICE="xray"
+            CONFIG="$CONFIG_XRAY"
+            BINARY="$XRAY"
             ;;
-        [Nn]*)
-            echo -e "${green}跳过配置文件下载${reset}"
+        2)
+            SERVICE="sing-box"
+            CONFIG="$CONFIG_SB"
+            BINARY="$SB"
             ;;
-         *)
-            echo -e "${red}无效选择，跳过配置文件下载，需自己手动上传${reset}"
+        *)
+            echo -e "${red}无效选择，请重试。${reset}"
+            exit 1
             ;;
     esac
-    rm -f /root/install.sh
+
+    echo "停止 $SERVICE 服务..."
+    systemctl stop "$SERVICE" 2>/dev/null
+    echo "禁用 $SERVICE 服务..."
+    systemctl disable "$SERVICE" 2>/dev/null
+    rm -f "/lib/systemd/system/$SERVICE.service" "/etc/systemd/system/$SERVICE.service"
+    systemctl daemon-reload
+    echo "删除配置文件 $CONFIG..."
+    rm -rf "$(dirname "$CONFIG")"
+    echo "删除二进制文件 $BINARY..."
+    rm -f "$BINARY"
+    echo "删除证书目录 $CERT_DIR..."
+    rm -rf "$CERT_DIR"
+    echo -e "${green}$SERVICE 已卸载！${reset}"
+    exit 0
 }
 
-#############################
-#           主流程          #
-#############################
-check_distro
-check_network
-update_system
-install_v2ray
+# 生成 VMess 配置 (sing-box)
+generate_vmess_sb_config() {
+    cat > "$CONFIG_SB" << EOF
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "inbounds": [
+    {
+      "type": "vmess",
+      "tag": "vmess-in",
+      "listen": "::",
+      "listen_port": $PORT,
+      "users": [
+        {
+          "name": "user",
+          "uuid": "$UUID",
+          "alterId": 0
+        }
+      ]$(if [[ "$USE_WS" == "y" ]]; then
+          echo -e ",\n      \"transport\": {\n        \"type\": \"ws\",\n        \"path\": \"$WS_PATH\"\n      }"
+        fi)$(if [[ "$USE_TLS" == "y" ]]; then
+          echo -e ",\n      \"tls\": {\n        \"enabled\": true,\n        \"certificate_path\": \"$CERT_FILE\",\n        \"key_path\": \"$KEY_FILE\"\n      }"
+        fi),
+      "tcp_fast_open": true,
+      "multiplex": {
+        "enabled": true
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ]
+}
+EOF
+}
+
+# 生成 Shadowsocks 配置 (sing-box)
+generate_shadowsocks_sb_config() {
+    cat > "$CONFIG_SB" << EOF
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "inbounds": [
+    {
+      "type": "shadowsocks",
+      "tag": "ss-in",
+      "listen": "::",
+      "listen_port": $PORT,
+      "method": "$SS_METHOD",
+      "password": "$PASSWORD",
+      "tcp_fast_open": true,
+      "multiplex": {
+        "enabled": true
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ]
+}
+EOF
+}
+
+# 生成 VLESS 配置 (sing-box)
+generate_vless_sb_config() {
+    cat > "$CONFIG_SB" << EOF
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "inbounds": [
+    {
+      "type": "vless",
+      "tag": "vless-in",
+      "listen": "::",
+      "listen_port": $PORT,
+      "users": [
+        {
+          "name": "user",
+          "uuid": "$UUID"
+        }
+      ]$(if [[ "$USE_WS" == "y" ]]; then
+          echo -e ",\n      \"transport\": {\n        \"type\": \"ws\",\n        \"path\": \"$WS_PATH\"\n      }"
+        fi)$(if [[ "$USE_TLS" == "y" ]]; then
+          echo -e ",\n      \"tls\": {\n        \"enabled\": true,\n        \"certificate_path\": \"$CERT_FILE\",\n        \"key_path\": \"$KEY_FILE\"\n      }"
+        fi),
+      "tcp_fast_open": true,
+      "multiplex": {
+        "enabled": true
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ]
+}
+EOF
+}
+
+# 生成 Trojan 配置 (sing-box)
+generate_trojan_sb_config() {
+    cat > "$CONFIG_SB" << EOF
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "inbounds": [
+    {
+      "type": "trojan",
+      "tag": "trojan-in",
+      "listen": "::",
+      "listen_port": $PORT,
+      "users": [
+        {
+          "name": "user",
+          "password": "$PASSWORD"
+        }
+      ]$(if [[ "$USE_WS" == "y" ]]; then
+          echo -e ",\n      \"transport\": {\n        \"type\": \"ws\",\n        \"path\": \"$WS_PATH\"\n      }"
+        fi),
+      "tls": {
+        "enabled": true,
+        "certificate_path": "$CERT_FILE",
+        "key_path": "$KEY_FILE"
+      },
+      "tcp_fast_open": true,
+      "multiplex": {
+        "enabled": false
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ]
+}
+EOF
+}
+
+# 生成 Hysteria2 配置 (sing-box)
+generate_hysteria2_sb_config() {
+    cat > "$CONFIG_SB" << EOF
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "inbounds": [
+    {
+      "type": "hysteria2",
+      "tag": "hysteria2-in",
+      "listen": "::",
+      "listen_port": $PORT,
+      "users": [
+        {
+          "password": "$PASSWORD"
+        }
+      ],
+      "tls": {
+        "enabled": true,
+        "certificate_path": "$CERT_FILE",
+        "key_path": "$KEY_FILE"
+      },
+      "obfuscation": {
+        "type": "salamander",
+        "password": "$PASSWORD"
+      },
+      "tcp_fast_open": true
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ]
+}
+EOF
+}
+
+# 生成 VMess 配置 (Xray)
+generate_vmess_xray_config() {
+    cat > "$CONFIG_XRAY" << EOF
+{
+  "log": {
+    "loglevel": "warning",
+    "access": "/var/log/xray/access.log",
+    "error": "/var/log/xray/error.log"
+  },
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "1.1.1.1"
+    ]
+  },
+  "inbounds": [
+    {
+      "port": $PORT,
+      "protocol": "vmess",
+      "settings": {
+        "clients": [
+          {
+            "id": "$UUID",
+            "alterId": 0
+          }
+        ]
+      }$(if [[ "$USE_WS" == "y" || "$USE_TLS" == "y" ]]; then
+          echo -e ",\n      \"streamSettings\": {\n        \"network\": \"$(if [[ "$USE_WS" == "y" ]]; then echo "ws"; else echo "tcp"; fi)\","
+          if [[ "$USE_WS" == "y" ]]; then
+            echo -e "        \"wsSettings\": {\n          \"path\": \"$WS_PATH\"\n        }"
+          fi
+          if [[ "$USE_TLS" == "y" ]]; then
+            echo -e "$(if [[ "$USE_WS" == "y" ]]; then echo ","; fi)\n        \"security\": \"tls\",\n        \"tlsSettings\": {\n          \"certificates\": [\n            {\n              \"certificateFile\": \"$CERT_FILE\",\n              \"keyFile\": \"$KEY_FILE\"\n            }\n          ]\n        }"
+          fi
+          echo -e "\n      }"
+        fi)
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "direct",
+      "settings": {}
+    }
+  ]
+}
+EOF
+}
+
+# 生成 Shadowsocks 配置 (Xray)
+generate_shadowsocks_xray_config() {
+    cat > "$CONFIG_XRAY" << EOF
+{
+  "log": {
+    "loglevel": "warning",
+    "access": "/var/log/xray/access.log",
+    "error": "/var/log/xray/error.log"
+  },
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "1.1.1.1"
+    ]
+  },
+  "inbounds": [
+    {
+      "port": $PORT,
+      "protocol": "shadowsocks",
+      "settings": {
+        "method": "$SS_METHOD",
+        "password": "$PASSWORD",
+        "network": "tcp,udp"
+      }$(if [[ "$USE_TLS" == "y" ]]; then
+          echo -e ",\n      \"streamSettings\": {\n        \"network\": \"tcp\",\n        \"security\": \"tls\",\n        \"tlsSettings\": {\n          \"certificates\": [\n            {\n              \"certificateFile\": \"$CERT_FILE\",\n              \"keyFile\": \"$KEY_FILE\"\n            }\n          ]\n        }\n      }"
+        fi)
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "direct",
+      "settings": {}
+    }
+  ]
+}
+EOF
+}
+
+# 生成 VLESS 配置 (Xray)
+generate_vless_xray_config() {
+    cat > "$CONFIG_XRAY" << EOF
+{
+  "log": {
+    "loglevel": "warning",
+    "access": "/var/log/xray/access.log",
+    "error": "/var/log/xray/error.log"
+  },
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "1.1.1.1"
+    ]
+  },
+  "inbounds": [
+    {
+      "port": $PORT,
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "$UUID"
+          }
+        ],
+        "decryption": "none"
+      }$(if [[ "$USE_WS" == "y" || "$USE_TLS" == "y" ]]; then
+          echo -e ",\n      \"streamSettings\": {\n        \"network\": \"$(if [[ "$USE_WS" == "y" ]]; then echo "ws"; else echo "tcp"; fi)\","
+          if [[ "$USE_WS" == "y" ]]; then
+            echo -e "        \"wsSettings\": {\n          \"path\": \"$WS_PATH\"\n        }"
+          fi
+          if [[ "$USE_TLS" == "y" ]]; then
+            echo -e "$(if [[ "$USE_WS" == "y" ]]; then echo ","; fi)\n        \"security\": \"tls\",\n        \"tlsSettings\": {\n          \"certificates\": [\n            {\n              \"certificateFile\": \"$CERT_FILE\",\n              \"keyFile\": \"$KEY_FILE\"\n            }\n          ]\n        }"
+          fi
+          echo -e "\n      }"
+        fi)
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "direct",
+      "settings": {}
+    }
+  ]
+}
+EOF
+}
+
+# 生成 Trojan 配置 (Xray)
+generate_trojan_xray_config() {
+    cat > "$CONFIG_XRAY" << EOF
+{
+  "log": {
+    "loglevel": "warning",
+    "access": "/var/log/xray/access.log",
+    "error": "/var/log/xray/error.log"
+  },
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "1.1.1.1"
+    ]
+  },
+  "inbounds": [
+    {
+      "port": $PORT,
+      "protocol": "trojan",
+      "settings": {
+        "clients": [
+          {
+            "password": "$PASSWORD"
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "$(if [[ "$USE_WS" == "y" ]]; then echo "ws"; else echo "tcp"; fi)",
+        $(if [[ "$USE_WS" == "y" ]]; then
+          echo -e "\"wsSettings\": {\n          \"path\": \"$WS_PATH\"\n        },"
+        fi)
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "$CERT_FILE",
+              "keyFile": "$KEY_FILE"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "direct",
+      "settings": {}
+    }
+  ]
+}
+EOF
+}
+
+# 选择 Shadowsocks 加密方法
+select_ss_method() {
+    echo "请选择 Shadowsocks 加密方法："
+    echo "1. aes-128-gcm"
+    echo "2. aes-256-gcm"
+    echo "3. chacha20-ietf-poly1305"
+    echo "4. 2022-blake3-aes-128-gcm (sing-box 专用)"
+    echo "5. 2022-blake3-aes-256-gcm (sing-box 专用)"
+    echo "6. 2022-blake3-chacha20-poly1305 (sing-box 专用)"
+    read -p "请输入选项 (1-6): " method_choice
+    case $method_choice in
+        1) SS_METHOD="aes-128-gcm";;
+        2) SS_METHOD="aes-256-gcm";;
+        3) SS_METHOD="chacha20-ietf-poly1305";;
+        4) SS_METHOD="2022-blake3-aes-128-gcm";;
+        5) SS_METHOD="2022-blake3-aes-256-gcm";;
+        6) SS_METHOD="2022-blake3-chacha20-poly1305";;
+        *) 
+            if [[ "$kernel_choice" == "1" ]]; then
+                echo -e "${red}无效选择，Xray 默认使用 chacha20-ietf-poly1305${reset}"
+                SS_METHOD="chacha20-ietf-poly1305"
+            else
+                echo -e "${red}无效选择，sing-box 默认使用 2022-blake3-aes-128-gcm${reset}"
+                SS_METHOD="2022-blake3-aes-128-gcm"
+            fi
+            ;;
+    esac
+    if [[ "$kernel_choice" == "1" && "$SS_METHOD" =~ ^2022-blake3 ]]; then
+        echo -e "${red}Xray 不支持 $SS_METHOD 加密方法，自动切换到 chacha20-ietf-poly1305${reset}"
+        SS_METHOD="chacha20-ietf-poly1305"
+    fi
+}
+
+# 选择协议
+select_protocol() {
+    echo "请选择协议："
+    echo "1. VMess"
+    echo "2. Shadowsocks"
+    echo "3. VLESS"
+    echo "4. Trojan"
+    if [[ "$kernel_choice" == "2" ]]; then
+        echo "5. Hysteria2 (sing-box 专用)"
+        max_option=5
+    else
+        max_option=4
+    fi
+    read -p "请输入选项 (1-$max_option): " protocol_choice
+    case $protocol_choice in
+        1) PROTOCOL="VMess";;
+        2) PROTOCOL="Shadowsocks"; select_ss_method; generate_ss_password;;
+        3) PROTOCOL="VLESS";;
+        4) PROTOCOL="Trojan"; generate_ss_password; USE_TLS="y";;
+        5) 
+            if [[ "$kernel_choice" == "2" ]]; then
+                PROTOCOL="Hysteria2"; generate_ss_password; USE_TLS="y"
+            else
+                echo -e "${red}无效选择，Hysteria2 仅限 sing-box${reset}"
+                exit 1
+            fi
+            ;;
+        *)
+            echo -e "${red}无效选择，请重试。${reset}"
+            exit 1
+            ;;
+    esac
+}
+
+# 配置 WebSocket 和 TLS 选项
+configure_transport() {
+    if [[ "$PROTOCOL" == "VMess" || "$PROTOCOL" == "VLESS" || "$PROTOCOL" == "Trojan" ]]; then
+        read -p "是否启用 WebSocket 传输？(y/n): " USE_WS
+        USE_WS=${USE_WS:-n}
+        if [[ "$USE_WS" == "y" ]]; then
+            generate_ws_path
+        fi
+    else
+        USE_WS="n"
+    fi
+    if [[ "$PROTOCOL" == "Shadowsocks" ]]; then
+        USE_TLS="n"  # 强制禁用 Shadowsocks 的 TLS
+    elif [[ "$PROTOCOL" != "Trojan" && "$PROTOCOL" != "Hysteria2" ]]; then
+        read -p "是否启用 TLS？(y/n): " USE_TLS
+        USE_TLS=${USE_TLS:-n}
+    fi
+}
+
+# 安装主函数
+install() {
+    echo "请选择内核："
+    echo "1. Xray"
+    echo "2. Sing-Box"
+    read -p "请输入选项 (1-2): " kernel_choice
+    case $kernel_choice in
+        1)
+            install_xray
+            SERVICE="xray"
+            CONFIG="$CONFIG_XRAY"
+            ;;
+        2)
+            install_singbox
+            SERVICE="sing-box"
+            CONFIG="$CONFIG_SB"
+            ;;
+        *)
+            echo -e "${red}无效选择，请重试。${reset}"
+            exit 1
+            ;;
+    esac
+
+    generate_port
+    select_protocol
+    configure_transport
+    generate_cert
+
+    case $PROTOCOL in
+        VMess)
+            if [[ "$kernel_choice" == "1" ]]; then
+                generate_vmess_xray_config
+            else
+                generate_vmess_sb_config
+            fi
+            ;;
+        Shadowsocks)
+            if [[ "$kernel_choice" == "1" ]]; then
+                generate_shadowsocks_xray_config
+            else
+                generate_shadowsocks_sb_config
+            fi
+            ;;
+        VLESS)
+            if [[ "$kernel_choice" == "1" ]]; then
+                generate_vless_xray_config
+            else
+                generate_vless_sb_config
+            fi
+            ;;
+        Trojan)
+            if [[ "$kernel_choice" == "1" ]]; then
+                generate_trojan_xray_config
+            else
+                generate_trojan_sb_config
+            fi
+            ;;
+        Hysteria2)
+            generate_hysteria2_sb_config
+            ;;
+    esac
+
+    mkdir -p "$(dirname "$CONFIG")"
+    validate_config "$CONFIG" || exit 1
+    download_config "$CONFIG"
+
+    echo "启用 $SERVICE 服务..."
+    if ! systemctl enable "$SERVICE" >/tmp/service-enable.log 2>&1; then
+        echo -e "${red}启用 $SERVICE 服务失败，错误日志：${reset}"
+        cat /tmp/service-enable.log
+        exit 1
+    fi
+    echo "重启 $SERVICE 服务..."
+    if ! (systemctl daemon-reload && systemctl restart "$SERVICE") >/tmp/service-restart.log 2>&1; then
+        echo -e "${red}服务启动失败，错误日志如下：${reset}"
+        cat /tmp/service-restart.log
+        echo -e "${red}服务状态：${reset}"
+        systemctl status "$SERVICE" --no-pager
+        echo -e "${red}最近的 $SERVICE 日志：${reset}"
+        journalctl -u "$SERVICE" -n 50 --no-pager
+        exit 1
+    fi
+
+    echo -e "${green}安装完成！${reset}"
+    echo "配置文件: $CONFIG"
+    echo "协议: $PROTOCOL"
+    echo "端口: $PORT"
+    if [[ "$PROTOCOL" == "VMess" || "$PROTOCOL" == "VLESS" || "$PROTOCOL" == "Trojan" ]]; then
+        echo "WebSocket 启用: ${USE_WS:-n}"
+        [[ "$USE_WS" == "y" ]] && echo "WebSocket 路径: $WS_PATH"
+    fi
+    if [[ "$PROTOCOL" == "VMess" || "$PROTOCOL" == "VLESS" ]]; then
+        echo "UUID: $UUID"
+    else
+        echo "密码: $PASSWORD"
+    fi
+    [[ "$PROTOCOL" == "Shadowsocks" ]] && echo "加密方法: $SS_METHOD"
+    echo "TLS 启用: ${USE_TLS:-n}"
+    [[ "$USE_TLS" == "y" ]] && echo -e "TLS 证书: $CERT_FILE\nTLS 私钥: $KEY_FILE\n证书域名: $RANDOM_DOMAIN"
+    [[ "$USE_TLS" == "y" ]] && echo -e "${red}注意：当前使用自签名证书，仅用于测试。生产环境中请替换为有效证书！${reset}"
+    echo "下载的配置文件: $CONFIG_DOWNLOAD"
+}
+
+# 主程序
+echo "请选择操作："
+echo "1. 安装服务"
+echo "2. 卸载服务"
+read -p "请输入选项 (1-2): " action_choice
+case $action_choice in
+    1)
+        check_root
+        check_distro
+        check_network
+        update_system
+        install
+        ;;
+    2)
+        check_root
+        uninstall_service
+        ;;
+    *)
+        echo -e "${red}无效选择，请重试。${reset}"
+        exit 1
+        ;;
+esac
