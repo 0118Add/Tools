@@ -960,7 +960,7 @@ mode_mihomo() {
 reset_config() {
   local root_folder="/root/mihomo"
   local config_file="$root_folder/config.yaml"
-  local remote_config_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Config/mihomo.yaml"
+  local remote_config_url="https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Config/mihomo.yaml"
   mkdir -p "$root_folder"
 
   local iface=$(ip route get 1 | awk '{print $5; exit}')
