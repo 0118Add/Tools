@@ -1,0 +1,279 @@
+######### 锚点 start #######
+# 策略组相关
+pr: &pr 
+     type: select
+     proxies: [全局规则,自动选择,香港,台湾,新加坡,日本,韩国,美国,其他,DIRECT]
+
+#这里是订阅更新和延迟测试相关的
+p: &p
+    type: http
+    interval: 3600
+    health-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}
+
+#规则集相关
+c: &c {type: http, interval: 86400, behavior: classical, format: text}
+d: &d {type: http, interval: 86400, behavior: domain, format: mrs}
+i: &i {type: http, interval: 86400, behavior: ipcidr, format: mrs}
+
+#延迟测试
+t: &t {type: url-test, url: https://www.gstatic.com/generate_204, interval: 300,tolerance: 50}
+
+######### 锚点 end #######
+
+# url 里填写自己的订阅,名称不能重复
+proxy-providers:
+  PQ:
+    <<: *p
+    url: "https://sub.cloxy.xyz/cloxy/d124969184ca2e0711bb6903c493dbec"
+    path: ./providers/proxy/PQ.yaml
+    exclude-filter: "套餐|流量|重置"
+
+port: 7890
+socks-port: 7891
+redir-port: 7892
+mixed-port: 7893
+tproxy-port: 7894
+ipv6: true
+allow-lan: true
+unified-delay: true
+tcp-concurrent: true
+external-ui: ui
+external-controller: 0.0.0.0:9090
+external-ui-url: "https://github.com/Zephyruso/zashboard/archive/refs/heads/gh-pages.zip"
+
+find-process-mode: off
+global-client-fingerprint: chrome
+
+profile:
+  store-selected: true
+
+sniffer:
+  enable: true
+  sniff:
+    HTTP:
+      ports: [80, 2231, 8080-8880]
+      override-destination: true
+    TLS:
+      ports: [443, 8443]
+    QUIC:
+      ports: [443, 8443]
+  skip-domain:
+    - "Mijia Cloud"
+    - "+.push.apple.com"
+
+tun:
+  enable: true
+  stack: mixed
+  dns-hijack:
+    - "any:53"
+    - "tcp://any:53"
+  auto-route: true
+  auto-redirect: true
+  auto-detect-interface: true
+  endpoint-independent-nat: true
+
+dns:
+  enable: true
+  listen: 0.0.0.0:1053
+  ipv6: true
+  enhanced-mode: fake-ip
+  fake-ip-range: 28.0.0.1/8
+  fake-ip-filter-mode: blacklist
+  fake-ip-filter:
+    - "*"
+    - "+.lan"
+    - "+.local"
+    - "+.market.xiaomi.com"
+  default-nameserver:
+    - tls://223.5.5.5
+    - tls://223.6.6.6
+  nameserver:
+    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query
+      
+proxy-groups:
+  - name: 全局规则
+    type: select
+    proxies: [自动选择,香港,台湾,新加坡,日本,韩国,美国,其他,DIRECT]
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/Global.png
+
+  - name: Emby服务
+    <<: *pr
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/Emby.png
+
+  - name: 电报信息
+    <<: *pr
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/Telegram.png
+
+  - name: 测速服务
+    <<: *pr
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/Speedtest.png
+
+  - name: 谷歌服务
+    <<: *pr
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/Google.png
+
+  - name: 油管视频
+    <<: *pr
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/YouTube.png
+
+  - name: 微软服务
+    <<: *pr
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/Microsoft.png
+
+  - name: AI服务
+    <<: *pr
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/OpenAI.png
+
+  - name: Spotify
+    <<: *pr
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/Spotify.png
+
+  - name: 漏网之鱼
+    <<: *pr
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/Final.png
+
+#地区分组
+  - name: 香港
+    <<: *t
+    include-all: true
+    filter: "(?i)港|hk|hongkong|hong kong"
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/HK.png
+
+  - name: 台湾
+    <<: *t
+    include-all: true
+    filter: "(?i)台|TW|Taiwan"
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/TW.png
+
+  - name: 新加坡
+    <<: *t
+    include-all: true
+    filter: "(?i)(新|sg|singapore)"
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/SG.png
+
+  - name: 日本
+    <<: *t
+    include-all: true
+    filter: "(?i)日|JP|Japan"
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/JP.png
+
+  - name: 韩国
+    <<: *t
+    include-all: true
+    filter: "(?i)(韩|KR|Korea|KOR)"
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/KR.png
+
+  - name: 美国
+    <<: *t
+    include-all: true
+    filter: "(?i)美|us|unitedstates|united states"
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/US.png
+
+  - name: 德国
+    <<: *t
+    include-all: true
+    filter: "(?i)德|DE|DEU|Germany"
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/DE.png
+
+  - name: 其他
+    type: select
+    include-all: true
+    filter: "(?i)^(?!.*(?:🇭🇰|🇯🇵|🇺🇸|🇸🇬|🇹🇼|港|hk|hongkong|台|tw|taiwan|日|JP|Japan|新|sg|singapore|韩|KR|Korea|KOR|美|us|unitedstates|united states|德|DE|DEU|Germany)).*"
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/CN.png
+    
+  - name: 全部节点
+    type: select
+    include-all: true
+    exclude-type: direct
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/Discovery.png
+
+  - name: 自动选择
+    type: url-test
+    include-all: true
+    exclude-type: direct
+    tolerance: 10
+    icon: https://ghfast.top/https://github.com/Orz-3/mini/blob/master/Color/Auto.png
+
+rules:
+  - RULE-SET,private,DIRECT
+  - RULE-SET,private_ip,DIRECT,no-resolve
+  - DST-PORT,8080,测速服务
+  - RULE-SET,speedtest,测速服务
+  - RULE-SET,emby,Emby服务
+  - RULE-SET,ai,AI服务
+  - RULE-SET,youtube,油管视频
+  - RULE-SET,google,谷歌服务
+  - RULE-SET,telegram,电报信息
+  - RULE-SET,microsoft,微软服务
+  - RULE-SET,spotify,Spotify
+  - RULE-SET,cn_domain,DIRECT
+  - RULE-SET,geolocation-!cn,漏网之鱼
+  
+  - RULE-SET,google_ip,谷歌服务
+  - RULE-SET,telegram_ip,电报信息
+  - RULE-SET,cn_ip,DIRECT
+  - MATCH,漏网之鱼
+  
+rule-providers:
+  emby:
+    <<: *c
+    url: "https://cf-workers-text2kv-eh7.pages.dev/emby.list?token=071496"
+    path: ./providers/rule/emby.list
+  private:
+    <<: *d
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/refs/heads/meta/geo/geosite/private.mrs"
+    path: ./providers/rule/private.mrs
+  speedtest:
+    <<: *d
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/refs/heads/meta/geo/geosite/speedtest.mrs"
+    path: ./providers/rule/speedtest.mrs
+  microsoft:
+    <<: *d
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/refs/heads/meta/geo/geosite/microsoft.mrs"
+    path: ./providers/rule/microsoft.mrs
+  ai:
+    <<: *d
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/refs/heads/meta/geo/geosite/category-ai-!cn.mrs"
+    path: ./providers/rule/ai.mrs
+  youtube:
+    <<: *d
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/refs/heads/meta/geo/geosite/youtube.mrs"
+    path: ./providers/rule/youtube.mrs
+  google:
+    <<: *d
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/refs/heads/meta/geo/geosite/google.mrs"
+    path: ./providers/rule/google.mrs
+  telegram:
+    <<: *d
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/telegram.mrs"
+    path: ./providers/rule/telegram.mrs
+  spotify:
+    <<: *d
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/refs/heads/meta/geo/geosite/spotify.mrs"
+    path: ./providers/rule/spotify.mrs
+  cn_domain:
+    <<: *d
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/cn.mrs"
+    path: ./providers/rule/cn.mrs
+  geolocation-!cn:
+    <<: *d
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/geolocation-!cn.mrs"
+    path: ./providers/rule/geolocation-!cn.mrs
+
+  private_ip:
+    <<: *i
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/private.mrs"
+    path: ./providers/rule/private_ip.mrs
+  cn_ip:
+    <<: *i
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/cn.mrs"
+    path: ./providers/rule/cn_ip.mrs
+  google_ip:
+    <<: *i
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/google.mrs"
+    path: ./providers/rule/google_ip.mrs
+  telegram_ip:
+    <<: *i
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/telegram.mrs"
+    path: ./providers/rule/telegram_ip.mrs
