@@ -160,7 +160,7 @@ download_mihomo() {
 # 服务配置
 download_service() {
     local service_file="/etc/systemd/system/mihomo.service"
-    local service_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Service/mihomo.service"
+    local service_url="https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Service/mihomo.service"
     wget -O "$service_file" "$(get_url "$service_url")" || {
         echo -e "${red}系统服务下载失败，请检查网络后重试${reset}"
         exit 1
@@ -190,7 +190,7 @@ download_wbeui() {
 # 管理脚本
 download_shell() {
     local shell_file="/usr/bin/mihomo"
-    local sh_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/mihomo/mihomo.sh"
+    local sh_url="https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Script/mihomo/mihomo.sh"
     [ -f "$shell_file" ] && rm -f "$shell_file"
     wget -O "$shell_file" "$(get_url "$sh_url")" || {
         echo -e "${red}管理脚本下载失败，请检查网络后重试${reset}"
@@ -238,7 +238,7 @@ config_proxy() {
 config_mihomo() {
   local root_folder="/root/mihomo"
   local config_file="/root/mihomo/config.yaml"
-  local remote_config_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Config/mihomo.yaml"
+  local remote_config_url="https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Config/mihomo.yaml"
   mkdir -p "$root_folder"
   read default_iface ipv4 ipv6 <<< "$(get_network_info)"
   wget -O "$config_file" "$(get_url "$remote_config_url")" || { 
