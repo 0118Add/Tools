@@ -354,7 +354,7 @@ install_mihomo() {
     local folders="/root/mihomo"
     local service_file="/etc/init.d/mihomo"
     local system_file="/etc/systemd/system/mihomo.service"
-    local install_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/mihomo/install.sh"
+    local install_url="https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Script/mihomo/install.sh"
     if [ -d "$folders" ]; then
         echo -e "${yellow}检测到 mihomo 已经安装, 并运行在 ${folders} 目录下${reset}"
         echo -e "${red}警告: 卸载后将删除全部内容！！！${reset}"
@@ -538,7 +538,7 @@ update_shell() {
     check_network
     local shell_file="/usr/bin/mihomo"
     local tmp_file="$(mktemp /tmp/mihomo.XXXXXX)"
-    local sh_ver_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Script/mihomo/mihomo.sh"
+    local sh_ver_url="https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Script/mihomo/mihomo.sh"
     trap 'rm -f "$tmp_file"' RETURN
     echo -e "${green}开始检查脚本是否有更新${reset}"
     local sh_new_ver=$(curl -sSL "$(get_url "$sh_ver_url")" | grep 'sh_ver="' | awk -F "=" '{print $NF}' | sed 's/\"//g' | head -1) || {
@@ -960,7 +960,7 @@ mode_mihomo() {
 reset_config() {
   local root_folder="/root/mihomo"
   local config_file="$root_folder/config.yaml"
-  local remote_config_url="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main/Config/mihomo.yaml"
+  local remote_config_url="https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main/Config/mihomo.yaml"
   mkdir -p "$root_folder"
 
   local iface=$(ip route get 1 | awk '{print $5; exit}')
