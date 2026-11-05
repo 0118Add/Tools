@@ -59,7 +59,7 @@ readonly LOGCLEAN_SERVICE="/etc/systemd/system/mihomo-logclean.service"
 readonly LOGCLEAN_TIMER="/etc/systemd/system/mihomo-logclean.timer"
 readonly LOGCLEAN_PERIODIC="/etc/periodic/daily/mihomo-logclean"
 
-readonly REPO_RAW="https://raw.githubusercontent.com/Abcd789JK/Tools/refs/heads/main"
+readonly REPO_RAW="https://raw.githubusercontent.com/0118Add/Tools/refs/heads/main"
 readonly SHELL_REPO="Abcd789JK/Tools"
 readonly MIHOMO_RELEASE="https://github.com/MetaCubeX/mihomo/releases/download"
 readonly MIHOMO_VERSION_URL="${MIHOMO_RELEASE}/Prerelease-Alpha/version.txt"
