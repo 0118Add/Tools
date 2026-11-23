@@ -3,9 +3,9 @@
 # --------------------------------------------------
 # name   : Backup_Win.sh
 # desc   : Windows 版 GitHub 仓库自动同步脚本，拉取更新并提交本地变更
-# date   : 2026-11-14 08:38:43
+# date   : 2026-11-22 11:31:33
 # author : ChatGPT JK789
-# ver    : 0.6.7
+# ver    : 0.6.9
 # --------------------------------------------------
 
 # 解释器守卫：必须早于 set -u 等 Bash 专有选项，给出可读错误提示。
@@ -36,7 +36,7 @@ if (( IS_WIN == 0 )); then
 fi
 
 # 声明当前脚本版本。
-readonly SCRIPT_VERSION="0.6.7"
+readonly SCRIPT_VERSION="0.6.9"
 
 # 脚本加载含凭据的 .env，收紧默认文件权限，避免新建文件被 group/other 读取。
 umask 077
@@ -46,8 +46,8 @@ umask 077
 # ==================================================
 
 readonly SCRIPT_NAME="GitHub 仓库本地变更同步脚本"
-readonly SCRIPT_DESCRIPTION="Windows 版，拉取 GitHub 仓库更新并检测本地变更，自动提交推送"
 readonly SCRIPT_AUTHOR="ChatGPT JK789"
+readonly SCRIPT_DESCRIPTION="拉取 GitHub 仓库更新并检测本地变更，自动提交推送"
 
 # 分隔线固定为 50 个可见 ASCII 字符。
 readonly HR="--------------------------------------------------"
@@ -127,55 +127,13 @@ kv() {
         "$COLOR_CYAN" "$label" "$COLOR_RESET" "$value"
 }
 
-# 计算文本的终端显示宽度：ASCII 1 字节宽 1，CJK/全角 3 字节宽 2，4 字节字符（如 emoji）按宽 2 估算。
-# 宽度 = (字符数 + 字节数) / 2。
-# 参数：$1 文本。stdout 输出显示宽度数值。
-_display_width() {
-    local text="$1"
-    local byte_count char_count
-    byte_count=$(printf '%s' "$text" | wc -c)
-    char_count=$(printf '%s' "$text" | LC_ALL=C.UTF-8 wc -m)
-    printf '%s' $(( (char_count + byte_count) / 2 ))
-}
-
-# 按终端显示宽度折行打印文本，自动在空格边界断行。
-# 参数：$1 缩进空格数；$2 ANSI 颜色码（可空，空则用终端默认色）；$3 文本。
-# 可用正文宽度 = 50 - 缩进，续行保持相同缩进。
-print_wrapped_text() {
-    local indent="$1"
-    local color="${2:-}"
-    local text="$3"
-    local max_width=$(( 50 - indent ))
-    local line="" line_width=0 word word_width first=1
-
-    for word in $text; do
-        word_width=$(_display_width "$word")
-        if (( first )); then
-            line="$word"
-            line_width=$word_width
-            first=0
-        elif (( line_width + 1 + word_width > max_width )); then
-            printf '%*s%s%s%s\n' "$indent" '' "$color" "$line" "$COLOR_RESET"
-            line="$word"
-            line_width=$word_width
-        else
-            line="$line $word"
-            line_width=$(( line_width + 1 + word_width ))
-        fi
-    done
-    if (( line_width > 0 )); then
-        printf '%*s%s%s%s\n' "$indent" '' "$color" "$line" "$COLOR_RESET"
-    fi
-}
-
-# 打印启动横幅：双线 → 名字/作者（标签青色）→ 单线 → 说明（标签青色）→ 说明文本 → 双线。
+# 打印启动横幅：双线 → 名称/作者（标签青色）→ 单线 → 说明（标签青色）→ 说明文本 → 双线。
 print_script_header() {
     hreq
-    printf '%s名  字:%s %s v%s\n' "$COLOR_CYAN" "$COLOR_RESET" "$SCRIPT_NAME" "$SCRIPT_VERSION"
-    printf '%s作  者:%s %s\n' "$COLOR_CYAN" "$COLOR_RESET" "$SCRIPT_AUTHOR"
+    printf '%s名  称%s %s v%s\n' "$COLOR_CYAN" "$COLOR_RESET" "$SCRIPT_NAME" "$SCRIPT_VERSION"
+    printf '%s作  者%s %s\n' "$COLOR_CYAN" "$COLOR_RESET" "$SCRIPT_AUTHOR"
     hr
-    printf '%s说  明:%s\n' "$COLOR_CYAN" "$COLOR_RESET"
-    printf '%s\n' "$SCRIPT_DESCRIPTION"
+    printf '%s说  明%s %s\n' "$COLOR_CYAN" "$COLOR_RESET" "$SCRIPT_DESCRIPTION"
     hreq
 }
 
@@ -555,7 +513,7 @@ main() {
     done
 
     # 集中检查必要依赖。
-    check_dependencies git grep sed date find wc uname
+    check_dependencies git grep sed date find uname
 
     # 记录 git 可执行路径与版本，便于排查环境差异（DEBUG 级）。
     log_debug "git 路径：$(command -v git)；版本：$(git --version 2>/dev/null || printf '未知')"
