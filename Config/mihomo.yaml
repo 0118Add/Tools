@@ -83,6 +83,10 @@ proxy-groups:
     type: select
     proxies: [自动选择,直连,香港,台湾,日本,新加坡,美国,其它地区,全部节点]
 
+  - name: Apple
+    type: select
+    proxies: [默认,香港,台湾,日本,新加坡,美国,其它地区,全部节点,自动选择,直连]  
+  
   - name: Google
     type: select
     proxies: [默认,香港,台湾,日本,新加坡,美国,其它地区,全部节点,自动选择,直连]
@@ -192,6 +196,7 @@ proxy-groups:
 
 rules:
   - RULE-SET,private_ip,直连,no-resolve
+  - RULE-SET,apple_domain,Apple
   - RULE-SET,github_domain,Github
   - RULE-SET,twitter_domain,Twitter
   - RULE-SET,youtube_domain,YouTube
@@ -222,6 +227,9 @@ rule-providers:
   cn_domain:
     <<: *domain
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/cn.mrs"
+  apple_domain:
+    <<: *domain
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/apple@cn.mrs"  
   github_domain:
     <<: *domain
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/github.mrs"
